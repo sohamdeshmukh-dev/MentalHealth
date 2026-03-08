@@ -43,9 +43,9 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-[#f4f3f8]">
-      {/* Sidebar */}
-      <div className="w-[360px] shrink-0 border-r border-slate-200">
+    <div className="flex h-screen w-screen gap-4 bg-[#050913] p-4">
+      {/* Sidebar widget */}
+      <div className="h-full w-[360px] shrink-0 overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950/85 shadow-2xl shadow-black/40">
         <Sidebar
           checkins={checkins}
           cityIndex={cityIndex}
@@ -54,7 +54,7 @@ export default function Home() {
       </div>
 
       {/* Map area */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 overflow-hidden rounded-[30px] border border-slate-800 shadow-2xl shadow-black/30">
         <Map3DView checkins={checkins} city={city} />
 
         {/* City navigator overlay — centered at top */}
@@ -64,10 +64,10 @@ export default function Home() {
 
         {/* City label bottom-left */}
         <div className="pointer-events-none absolute bottom-6 left-6">
-          <p className="text-2xl font-bold text-slate-700 drop-shadow-sm">
+          <p className="text-2xl font-bold text-slate-100 drop-shadow-md">
             {city.name}
           </p>
-          <p className="text-sm text-slate-400">{city.state}</p>
+          <p className="text-sm text-slate-300/80">{city.state}</p>
         </div>
       </div>
     </div>

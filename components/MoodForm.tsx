@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Mood, MOODS, CheckIn } from "@/lib/types";
+import { Mood, CheckIn } from "@/lib/types";
+import EmotionWheelSelector from "./EmotionWheelSelector";
 
 interface MoodFormProps {
   cityName: string;
@@ -41,27 +42,11 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-700">
+      <h2 className="text-sm font-semibold text-slate-200">
         How are you feeling?
       </h2>
 
-      <div className="grid grid-cols-3 gap-2">
-        {MOODS.map((m) => (
-          <button
-            key={m.label}
-            type="button"
-            onClick={() => setSelectedMood(m.label)}
-            className={`flex flex-col items-center gap-1 rounded-lg border p-2.5 text-xs transition-all ${
-              selectedMood === m.label
-                ? "border-indigo-400 bg-indigo-50 shadow-sm"
-                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-            }`}
-          >
-            <span className="text-xl">{m.icon}</span>
-            <span className="text-slate-600">{m.label}</span>
-          </button>
-        ))}
-      </div>
+      <EmotionWheelSelector value={selectedMood} onChange={setSelectedMood} />
 
       <textarea
         value={message}
@@ -69,13 +54,13 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
         placeholder="Share how you're feeling (optional)..."
         maxLength={280}
         rows={2}
-        className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+        className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
       />
 
       <button
         type="submit"
         disabled={!selectedMood || submitting}
-        className="w-full rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded-lg bg-indigo-500 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Submitting..." : "Check In"}
       </button>

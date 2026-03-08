@@ -3,11 +3,39 @@
 import { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { CheckIn, MOODS, CityConfig } from "@/lib/types";
+import { CheckIn, MOODS, CityConfig, Mood } from "@/lib/types";
 import { buildSkylineGeoJSON, buildPointGeoJSON } from "@/lib/gridAggregator";
 import { buildCityMask } from "@/lib/cityMask";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+
+const MOODS_BY_STRESS = [...MOODS].sort((a, b) => a.weight - b.weight);
+
+const HEATMAP_ALPHA: Record<Mood, number> = {
+  Calm: 0.35,
+  Happy: 0.4,
+  Neutral: 0.45,
+  Sad: 0.55,
+  Overwhelmed: 0.65,
+  Stressed: 0.78,
+};
+
+function hexToRgba(hex: string, alpha: number) {
+  const sanitized = hex.replace("#", "");
+  if (sanitized.length !== 6) return `rgba(148,163,184,${alpha})`;
+  const r = Number.parseInt(sanitized.slice(0, 2), 16);
+  const g = Number.parseInt(sanitized.slice(2, 4), 16);
+  const b = Number.parseInt(sanitized.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const HEATMAP_COLOR_STOPS = MOODS_BY_STRESS.flatMap((m) => [
+  m.weight,
+  hexToRgba(m.color, HEATMAP_ALPHA[m.label]),
+]);
+
+const SKYLINE_COLOR_STOPS = MOODS_BY_STRESS.flatMap((m) => [m.weight, m.color]);
+const CIRCLE_COLOR_STOPS = MOODS.flatMap((m) => [m.label, m.color]);
 
 interface Map3DViewProps {
   checkins: CheckIn[];
@@ -56,10 +84,10 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
       map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
 
       map.setFog({
-        color: "rgba(240, 240, 255, 0.9)",
-        "high-color": "rgba(200, 210, 240, 0.8)",
-        "horizon-blend": 0.12,
-        "space-color": "rgba(220, 230, 250, 1)",
+        color: "rgba(12, 18, 34, 0.95)",
+        "high-color": "rgba(15, 23, 42, 0.85)",
+        "horizon-blend": 0.18,
+        "space-color": "rgba(2, 6, 23, 1)",
         "star-intensity": 0.0,
       });
 
@@ -74,8 +102,8 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         type: "fill",
         source: "city-mask",
         paint: {
-          "fill-color": "#e8e6f0",
-          "fill-opacity": 0.72,
+          "fill-color": "#0f172a",
+          "fill-opacity": 0.58,
         },
       });
 
@@ -84,7 +112,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         type: "line",
         source: "city-mask",
         paint: {
-          "line-color": "rgba(99, 102, 241, 0.25)",
+          "line-color": "rgba(129, 140, 248, 0.32)",
           "line-width": 2,
           "line-blur": 4,
         },
@@ -105,10 +133,10 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
           type: "fill-extrusion",
           minzoom: 13,
           paint: {
-            "fill-extrusion-color": "#c7c3d4",
+            "fill-extrusion-color": "#334155",
             "fill-extrusion-height": ["get", "height"],
             "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": 0.35,
+            "fill-extrusion-opacity": 0.55,
           },
         },
         labelLayerId
@@ -148,13 +176,8 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
             "heatmap-color": [
               "interpolate", ["linear"], ["heatmap-density"],
               0,    "rgba(0,0,0,0)",
-              0.1,  "rgba(96,165,250,0.35)",
-              0.25, "rgba(52,211,153,0.4)",
-              0.4,  "rgba(167,139,250,0.45)",
-              0.55, "rgba(251,191,36,0.55)",
-              0.7,  "rgba(251,146,60,0.65)",
-              0.85, "rgba(239,68,68,0.75)",
-              1,    "rgba(220,38,38,0.85)",
+              ...HEATMAP_COLOR_STOPS,
+              1, hexToRgba(MOODS_BY_STRESS[MOODS_BY_STRESS.length - 1].color, 0.9),
             ],
             "heatmap-opacity": [
               "interpolate", ["linear"], ["zoom"],
@@ -177,17 +200,11 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
               "interpolate",
               ["linear"],
               ["get", "weight"],
-              0.0,  "#60a5fa",
-              0.15, "#34d399",
-              0.35, "#a78bfa",
-              0.5,  "#fbbf24",
-              0.65, "#fb923c",
-              0.8,  "#ef4444",
-              1.0,  "#dc2626",
+              ...SKYLINE_COLOR_STOPS,
             ],
             "fill-extrusion-height": ["get", "height"],
             "fill-extrusion-base": 0,
-            "fill-extrusion-opacity": 0.82,
+            "fill-extrusion-opacity": 0.78,
           },
         },
         labelLayerId
@@ -203,17 +220,12 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 3, 18, 8],
           "circle-color": [
             "match", ["get", "mood"],
-            "Happy", "#34d399",
-            "Calm", "#60a5fa",
-            "Neutral", "#a78bfa",
-            "Stressed", "#fb923c",
-            "Sad", "#818cf8",
-            "Overwhelmed", "#f87171",
-            "#999",
+            ...CIRCLE_COLOR_STOPS,
+            "#94a3b8",
           ],
           "circle-opacity": 0.85,
           "circle-stroke-width": 1,
-          "circle-stroke-color": "rgba(255,255,255,0.5)",
+          "circle-stroke-color": "rgba(241,245,249,0.45)",
         },
       });
 
@@ -226,12 +238,12 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         };
         const icon = MOODS.find((m) => m.label === mood)?.icon ?? "";
         const stressLevel = Math.round(weight * 100);
-        new mapboxgl.Popup({ className: "light-popup", offset: 12 })
+        new mapboxgl.Popup({ className: "dark-popup", offset: 12 })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<div style="font-size:13px;color:#1e293b">
+            `<div style="font-size:13px;color:#f1f5f9">
               <strong>${icon} ${mood}</strong>
-              <p style="margin:4px 0 0;color:#64748b">${count} report${count > 1 ? "s" : ""} &middot; ${stressLevel}% stress</p>
+              <p style="margin:4px 0 0;color:#94a3b8">${count} report${count > 1 ? "s" : ""} &middot; ${stressLevel}% stress</p>
             </div>`
           )
           .addTo(map);
@@ -245,12 +257,12 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         };
         const icon = MOODS.find((m) => m.label === mood)?.icon ?? "";
         const time = new Date(timestamp).toLocaleString();
-        new mapboxgl.Popup({ className: "light-popup", offset: 12 })
+        new mapboxgl.Popup({ className: "dark-popup", offset: 12 })
           .setLngLat(f.geometry.coordinates as [number, number])
           .setHTML(
-            `<div style="font-size:13px;color:#1e293b">
+            `<div style="font-size:13px;color:#f1f5f9">
               <strong>${icon} ${mood}</strong>
-              ${message ? `<p style="margin:4px 0 0;color:#64748b">${message}</p>` : ""}
+              ${message ? `<p style="margin:4px 0 0;color:#cbd5e1">${message}</p>` : ""}
               <p style="margin:4px 0 0;color:#94a3b8;font-size:11px">${time}</p>
             </div>`
           )

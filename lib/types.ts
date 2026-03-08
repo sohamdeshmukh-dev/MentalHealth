@@ -19,12 +19,12 @@ export interface CityConfig {
 }
 
 export const MOODS: { label: Mood; color: string; icon: string; weight: number }[] = [
-  { label: "Happy", color: "#34d399", icon: "😊", weight: 0.2 },
   { label: "Calm", color: "#60a5fa", icon: "😌", weight: 0.1 },
+  { label: "Happy", color: "#34d399", icon: "😊", weight: 0.25 },
   { label: "Neutral", color: "#a78bfa", icon: "😐", weight: 0.4 },
-  { label: "Stressed", color: "#fb923c", icon: "😰", weight: 0.7 },
-  { label: "Sad", color: "#818cf8", icon: "😢", weight: 0.8 },
-  { label: "Overwhelmed", color: "#f87171", icon: "😵", weight: 1.0 },
+  { label: "Sad", color: "#fbbf24", icon: "😢", weight: 0.55 },
+  { label: "Overwhelmed", color: "#fb923c", icon: "😵", weight: 0.7 },
+  { label: "Stressed", color: "#ef4444", icon: "😰", weight: 0.85 },
 ];
 
 export const CITIES: CityConfig[] = [
