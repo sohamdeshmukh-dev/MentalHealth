@@ -15,6 +15,7 @@ export function checkinsToGeoJSON(checkins: CheckIn[]): GeoJSON.FeatureCollectio
             properties: {
                 mood: c.mood,
                 weight: MOOD_WEIGHT[c.mood] ?? 0.5,
+                intensity: MOOD_WEIGHT[c.mood] ?? 0.5, // Allow both naming conventions
                 city: c.city,
                 message: c.message
             },

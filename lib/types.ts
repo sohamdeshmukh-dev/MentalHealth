@@ -4,10 +4,18 @@ export interface CheckIn {
   id: string;
   mood: Mood;
   message: string;
-  timestamp: string;
+  timestamp: number;
   lat: number;
   lng: number;
   city: string;
+}
+
+export interface Resource {
+  name: string;
+  address1: string;
+  lat: number;
+  lng: number;
+  phone?: string;
 }
 
 export interface CityConfig {
@@ -45,5 +53,14 @@ export const MOOD_WEIGHT: Record<string, number> = {
   Neutral: 0.4,
   Stressed: 0.7,
   Sad: 0.85,
+  Overwhelmed: 1.0,
+};
+
+export const MOOD_INTENSITY: Record<string, number> = {
+  Happy: 0.1,
+  Calm: 0.2,
+  Neutral: 0.4,
+  Stressed: 0.7,
+  Sad: 0.8,
   Overwhelmed: 1.0,
 };

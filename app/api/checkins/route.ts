@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     id: uuidv4(),
     mood: mood as Mood,
     message: message?.slice(0, 280) ?? "",
-    timestamp: new Date().toISOString(),
+    timestamp: Date.now(),
     lat: targetCity.lat + (Math.random() - 0.5) * 0.06,
     lng: targetCity.lng + (Math.random() - 0.5) * 0.06,
     city: targetCity.name,

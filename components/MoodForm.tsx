@@ -47,6 +47,9 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
         setMessage("");
         setSuccess(true);
         setTimeout(() => setSuccess(false), 2500);
+      } else {
+        const err = await res.json();
+        console.error("Supabase insert failed:", err);
       }
     } finally {
       setSubmitting(false);

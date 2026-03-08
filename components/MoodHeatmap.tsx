@@ -39,6 +39,13 @@ export default function MoodHeatmap({ map, checkins, selectedCity, selectedMood 
                     type: 'heatmap',
                     source: SOURCE_ID,
                     paint: {
+                        'heatmap-weight': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'intensity'],
+                            0, 0,
+                            1, 1
+                        ],
                         'heatmap-color': [
                             'interpolate',
                             ['linear'],

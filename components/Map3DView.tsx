@@ -7,7 +7,8 @@ import { CheckIn, MOODS, CityConfig, Mood } from "@/lib/types";
 import { buildSkylineGeoJSON, buildPointGeoJSON } from "@/lib/gridAggregator";
 import { buildCityMask } from "@/lib/cityMask";
 import MoodHeatmap from "./MoodHeatmap";
-
+import ResourceMarkers from "./ResourceMarkers";
+import { getResourcesByCity } from "@/lib/store";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -299,7 +300,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    if (!Array.isArray(checkins) || checkins.length === 0) return;
+    if (!Array.isArray(checkins)) return;
 
     const ptSrc = map.getSource("mood-points") as mapboxgl.GeoJSONSource | undefined;
     if (ptSrc) ptSrc.setData(pointData(checkins));
@@ -312,6 +313,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
     <>
       <div ref={containerRef} className="h-full w-full" />
       <MoodHeatmap map={mapInstance} checkins={checkins} selectedCity={city.name} />
+      <ResourceMarkers map={mapInstance} resources={getResourcesByCity(city.name)} />
     </>
   );
 }

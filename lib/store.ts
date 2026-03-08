@@ -1,4 +1,4 @@
-import { CheckIn, CITIES, MOODS, CityConfig } from "./types";
+import { CheckIn, CITIES, MOODS, CityConfig, Resource } from "./types";
 
 const checkins: CheckIn[] = [];
 let seeded = false;
@@ -70,4 +70,50 @@ export function getCheckInsByCity(city: string): CheckIn[] {
 export function addCheckIn(entry: CheckIn): CheckIn {
   checkins.push(entry);
   return entry;
+}
+
+export const SAMPLE_RESOURCES: Record<string, Resource[]> = {
+  Philadelphia: [
+    {
+      name: "Hall-Mercer Community MH Center",
+      address1: "245 S 8th St",
+      lat: 39.9463,
+      lng: -75.1551,
+      phone: "215-829-5249",
+    },
+    {
+      name: "Consortium Inc",
+      address1: "5501 Chestnut St",
+      lat: 39.9575,
+      lng: -75.2319,
+      phone: "215-748-8400",
+    },
+    {
+      name: "Intercultural Family Services Inc",
+      address1: "4225 Chestnut St",
+      lat: 39.9567,
+      lng: -75.2078,
+      phone: "215-386-1298",
+    },
+  ],
+  Chicago: [
+    {
+      name: "Thresholds",
+      address1: "4101 N Ravenswood Ave",
+      lat: 41.9566,
+      lng: -87.6746,
+      phone: "773-572-5200",
+    },
+    {
+      name: "Bobby E Wright Comprehensive BH Center",
+      address1: "9 S Kedzie Ave",
+      lat: 41.8812,
+      lng: -87.7062,
+      phone: "773-722-7900",
+    },
+  ],
+};
+
+export function getResourcesByCity(cityName: string): Resource[] {
+  return SAMPLE_RESOURCES[cityName] ?? [];
 }

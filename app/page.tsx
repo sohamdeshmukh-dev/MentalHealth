@@ -15,6 +15,7 @@ export default function Home() {
   const [cityIndex, setCityIndex] = useState(0);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(async () => {
@@ -59,6 +60,26 @@ export default function Home() {
     }
   }, []);
 
+  const seedMockData = async () => {
+    setIsSeeding(true);
+    const moods = ["Happy", "Calm", "Neutral", "Stressed", "Sad", "Overwhelmed"];
+    try {
+      const promises = Array.from({ length: 50 }).map(() => {
+        const randomMood = moods[Math.floor(Math.random() * moods.length)];
+        return fetch("/api/checkins", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mood: randomMood, city: city.name, message: "Mock seeded data" })
+        });
+      });
+      await Promise.all(promises);
+      await fetchCheckins();
+    } catch (err) {
+      console.error("Error seeding mock data:", err);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen gap-4 bg-[#050913] p-4">
@@ -83,11 +104,20 @@ export default function Home() {
         </div>
 
         {/* City label bottom-left */}
-        <div className="pointer-events-none absolute bottom-6 left-6">
-          <p className="text-2xl font-bold text-slate-100 drop-shadow-md">
-            {city.name}
-          </p>
-          <p className="text-sm text-slate-300/80">{city.state}</p>
+        <div className="pointer-events-none absolute bottom-6 left-6 flex items-end gap-3">
+          <div>
+            <p className="text-2xl font-bold text-slate-100 drop-shadow-md">
+              {city.name}
+            </p>
+            <p className="text-sm text-slate-300/80">{city.state}</p>
+          </div>
+          <button
+            onClick={seedMockData}
+            disabled={isSeeding}
+            className="pointer-events-auto rounded-full bg-slate-800/80 px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-slate-300 backdrop-blur-md hover:bg-slate-700/80 disabled:opacity-50 border border-slate-700/50 transition duration-200 ml-2"
+          >
+            {isSeeding ? "Seeding..." : "Seed 50 Points"}
+          </button>
         </div>
       </div>
     </div>
