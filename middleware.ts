@@ -41,11 +41,17 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
+    // If user is logged in and they're accessing the login page
+    if (user && request.nextUrl.pathname === '/login') {
+        return NextResponse.redirect(new URL('/', request.url))
+    }
+
     return response
 }
 
 export const config = {
     matcher: [
         '/',
+        '/login',
     ],
 }

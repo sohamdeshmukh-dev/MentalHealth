@@ -1,6 +1,6 @@
-'use client';
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+"use client";
+import { useState, useEffect, useMemo } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -10,25 +10,40 @@ export default function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
     const router = useRouter();
 
+    const supabase = useMemo(() => createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ), []);
+
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                router.refresh();
+                router.push('/');
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [router, supabase.auth]);
+
     const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        if (isSignUp) {
-            const { error } = await supabase.auth.signUp({ email, password });
-            if (!error) {
-                router.push('/');
+        try {
+            if (isSignUp) {
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
             } else {
-                console.error(error);
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
             }
-        } else {
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (!error) {
-                router.push('/');
-            } else {
-                console.error(error);
-            }
+            // onAuthStateChange will handle redirection
+        } catch (error) {
+            console.error(error);
+            alert(error instanceof Error ? error.message : 'An error occurred during authentication');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleOAuth = async (provider: 'google' | 'facebook') => {
