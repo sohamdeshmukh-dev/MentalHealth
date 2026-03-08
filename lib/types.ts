@@ -37,5 +37,13 @@ export const CITIES: CityConfig[] = [
   { name: "San Antonio", state: "TX", lat: 29.4241, lng: -98.4936, radius: 18 },
   { name: "San Diego", state: "CA", lat: 32.7157, lng: -117.1611, radius: 16 },
   { name: "Dallas", state: "TX", lat: 32.7767, lng: -96.797, radius: 18 },
-  { name: "Jacksonville", state: "FL", lat: 30.3322, lng: -81.6557, radius: 18 },
 ];
+
+export const MOOD_WEIGHT: Record<string, number> = {
+  Happy: 0.1,
+  Calm: 0.2,
+  Neutral: 0.4,
+  Stressed: 0.7,
+  Sad: 0.85,
+  Overwhelmed: 1.0,
+};

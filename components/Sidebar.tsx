@@ -3,22 +3,31 @@
 import { CheckIn, MOODS, CITIES } from "@/lib/types";
 import MoodForm from "./MoodForm";
 import HeatmapLegend from "./HeatmapLegend";
+import dynamic from 'next/dynamic';
+
+const LocalClock = dynamic(() => import('./LocalClock'), { ssr: false });
+
 
 interface SidebarProps {
   checkins: CheckIn[];
   cityIndex: number;
   onNewCheckin: (entry: CheckIn) => void;
+  userLat: number | null;
+  userLng: number | null;
 }
 
 export default function Sidebar({
   checkins,
   cityIndex,
   onNewCheckin,
+  userLat,
+  userLng,
 }: SidebarProps) {
   const city = CITIES[cityIndex];
 
   return (
     <aside className="flex h-full w-full flex-col gap-5 overflow-y-auto bg-slate-950/95 p-5 backdrop-blur-sm">
+      <LocalClock lat={userLat} lng={userLng} />
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-100">

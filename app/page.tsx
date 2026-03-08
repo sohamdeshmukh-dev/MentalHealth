@@ -13,6 +13,8 @@ const Map3DView = dynamic(() => import("@/components/Map3DView"), {
 export default function Home() {
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [cityIndex, setCityIndex] = useState(0);
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(() => {
@@ -42,6 +44,16 @@ export default function Home() {
     setCheckins((prev) => [entry, ...prev]);
   }
 
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setUserLat(position.coords.latitude);
+        setUserLng(position.coords.longitude);
+      });
+    }
+  }, []);
+
+
   return (
     <div className="flex h-screen w-screen gap-4 bg-[#050913] p-4">
       {/* Sidebar widget */}
@@ -50,6 +62,8 @@ export default function Home() {
           checkins={checkins}
           cityIndex={cityIndex}
           onNewCheckin={handleNewCheckin}
+          userLat={userLat}
+          userLng={userLng}
         />
       </div>
 

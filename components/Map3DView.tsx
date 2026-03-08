@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { CheckIn, MOODS, CityConfig, Mood } from "@/lib/types";
 import { buildSkylineGeoJSON, buildPointGeoJSON } from "@/lib/gridAggregator";
 import { buildCityMask } from "@/lib/cityMask";
+import MoodHeatmap from "./MoodHeatmap";
+
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -45,6 +47,7 @@ interface Map3DViewProps {
 export default function Map3DView({ checkins, city }: Map3DViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
   const readyRef = useRef(false);
 
   // Memoised builders
@@ -63,7 +66,8 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/soso593/cmmh6jzoe003m01qn8f00gog6",
+      style: "mapbox://styles/mapbox/standard",
+      config: { basemap: { theme: "monochrome", lightPreset: "night" } },
       center: [city.lng, city.lat],
       zoom: 12,
       pitch: 60,
@@ -175,7 +179,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
             ],
             "heatmap-color": [
               "interpolate", ["linear"], ["heatmap-density"],
-              0,    "rgba(0,0,0,0)",
+              0, "rgba(0,0,0,0)",
               ...HEATMAP_COLOR_STOPS,
               1, hexToRgba(MOODS_BY_STRESS[MOODS_BY_STRESS.length - 1].color, 0.9),
             ],
@@ -282,7 +286,8 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
     });
 
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; readyRef.current = false; };
+    setMapInstance(map);
+    return () => { map.remove(); mapRef.current = null; setMapInstance(null); readyRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -316,5 +321,10 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
     if (skySrc) skySrc.setData(skylineData(checkins));
   }, [checkins, pointData, skylineData]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <>
+      <div ref={containerRef} className="h-full w-full" />
+      <MoodHeatmap map={mapInstance} checkins={checkins} />
+    </>
+  );
 }
