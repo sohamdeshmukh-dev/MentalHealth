@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { CheckIn, Mood, MOODS, CITIES } from "@/lib/types";
+import { detectCampus } from "@/lib/campusDetection";
 import { v4 as uuidv4 } from "uuid";
 
 export async function GET(request: NextRequest) {
@@ -35,14 +36,20 @@ export async function POST(request: Request) {
 
   const targetCity = CITIES.find((c) => c.name === city) ?? CITIES[0];
 
+  const lat = targetCity.lat + (Math.random() - 0.5) * 0.06;
+  const lng = targetCity.lng + (Math.random() - 0.5) * 0.06;
+  const campus = detectCampus(lat, lng);
+
   const entry: CheckIn = {
     id: uuidv4(),
     mood: mood as Mood,
     message: message?.slice(0, 280) ?? "",
     timestamp: Date.now(),
-    lat: targetCity.lat + (Math.random() - 0.5) * 0.06,
-    lng: targetCity.lng + (Math.random() - 0.5) * 0.06,
+    lat,
+    lng,
     city: targetCity.name,
+    hugs: 0,
+    campus_name: campus?.name,
   };
 
   const { error } = await supabase.from("checkins").insert([entry]);

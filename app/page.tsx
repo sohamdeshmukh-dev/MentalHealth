@@ -16,6 +16,8 @@ export default function Home() {
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [timeFilter, setTimeFilter] = useState("All");
+  const [isCampusMode, setIsCampusMode] = useState(false);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(async () => {
@@ -36,6 +38,7 @@ export default function Home() {
 
   // Keyboard navigation
   useEffect(() => {
+    setIsCampusMode(false); // Reset campus mode on city change
     function handleKey(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") {
         setCityIndex((i) => (i - 1 + CITIES.length) % CITIES.length);
@@ -59,6 +62,25 @@ export default function Home() {
       });
     }
   }, []);
+
+  function handleHug(id: string) {
+    setCheckins((prev) => prev.map((c) => (c.id === id ? { ...c, hugs: (c.hugs || 0) + 1 } : c)));
+    fetch("/api/checkins/hug", { method: "POST", body: JSON.stringify({ id }) }).catch(console.error);
+  }
+
+  const filteredCheckins = checkins.filter((c) => {
+    if (isCampusMode && !c.campus_name) return false;
+    if (timeFilter === "All") return true;
+    const hour = new Date(c.timestamp).getHours();
+    if (timeFilter === "Morning") return hour >= 5 && hour < 12;
+    if (timeFilter === "Afternoon") return hour >= 12 && hour < 17;
+    if (timeFilter === "Evening") return hour >= 17 && hour < 21;
+    if (timeFilter === "Night") return hour >= 21 || hour < 5;
+    return true;
+  });
+
+  // Find dominant campus in current city
+  const dominantCampus = checkins.find((c) => c.campus_name)?.campus_name;
 
   const seedMockData = async () => {
     setIsSeeding(true);
@@ -86,9 +108,10 @@ export default function Home() {
       {/* Sidebar widget */}
       <div className="h-full w-[360px] shrink-0 overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950/85 shadow-2xl shadow-black/40">
         <Sidebar
-          checkins={checkins}
+          checkins={filteredCheckins}
           cityIndex={cityIndex}
           onNewCheckin={handleNewCheckin}
+          onHug={handleHug}
           userLat={userLat}
           userLng={userLng}
         />
@@ -96,7 +119,39 @@ export default function Home() {
 
       {/* Map area */}
       <div className="relative flex-1 overflow-hidden rounded-[30px] border border-slate-800 shadow-2xl shadow-black/30">
-        <Map3DView checkins={checkins} city={city} />
+        <Map3DView checkins={filteredCheckins} city={city} focusedCampus={isCampusMode ? dominantCampus : undefined} />
+
+        {/* Filters Top Right */}
+        <div className="pointer-events-auto absolute right-5 top-5 z-10 flex flex-col gap-2 items-end">
+          {/* Time-of-Day Filter */}
+          <div className="flex cursor-pointer rounded-full border border-slate-700/50 bg-slate-900/80 p-1 shadow-lg backdrop-blur-md">
+            {["All", "Morning", "Afternoon", "Evening", "Night"].map((f) => (
+              <div
+                key={f}
+                onClick={() => setTimeFilter(f)}
+                className={`rounded-full px-4 py-1.5 text-xs font-semibold tracking-wide transition-colors ${timeFilter === f
+                  ? "bg-indigo-600 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200"
+                  }`}
+              >
+                {f}
+              </div>
+            ))}
+          </div>
+
+          {/* Campus Toggle */}
+          {dominantCampus && (
+            <button
+              onClick={() => setIsCampusMode(!isCampusMode)}
+              className={`rounded-full px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors border ${isCampusMode
+                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
+                  : "border-slate-700/50 bg-slate-900/80 text-slate-300 hover:bg-slate-800"
+                }`}
+            >
+              🎓 Focus on Campus: {dominantCampus}
+            </button>
+          )}
+        </div>
 
         {/* City navigator overlay — centered at top */}
         <div className="pointer-events-auto absolute left-1/2 top-5 z-10 -translate-x-1/2">

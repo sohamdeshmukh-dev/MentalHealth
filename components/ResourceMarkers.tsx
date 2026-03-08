@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Resource } from '@/lib/types';
 
@@ -10,6 +10,16 @@ interface Props {
 
 export default function ResourceMarkers({ map, resources }: Props) {
     const markersRef = useRef<mapboxgl.Marker[]>([]);
+    const [isCrisisMode, setIsCrisisMode] = useState(false);
+
+    useEffect(() => {
+        const handler = () => {
+            setIsCrisisMode(true);
+            setTimeout(() => setIsCrisisMode(false), 5000); // Reset after 5s
+        };
+        window.addEventListener('crisis_alert', handler as EventListener);
+        return () => window.removeEventListener('crisis_alert', handler as EventListener);
+    }, []);
 
     useEffect(() => {
         if (!map) return;
@@ -22,16 +32,28 @@ export default function ResourceMarkers({ map, resources }: Props) {
         resources.forEach((resource) => {
             const el = document.createElement('div');
             el.className = 'group cursor-pointer';
-            el.innerHTML = `
-                <div class="relative flex items-center justify-center">
-                    <!-- Outer glow -->
-                    <div class="absolute inset-0 animate-ping rounded-full bg-blue-400 opacity-20 duration-[3000ms]"></div>
-                    <!-- Marker body -->
-                    <div class="z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 shadow-lg transition-transform hover:scale-110">
-                        <span class="text-xs">🏥</span>
+
+            if (isCrisisMode) {
+                el.innerHTML = `
+                    <div class="relative flex items-center justify-center">
+                        <div class="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-60 duration-[800ms]"></div>
+                        <div class="z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-red-200 bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.6)] transition-transform scale-110">
+                            <span class="text-xs">🏥</span>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                el.innerHTML = `
+                    <div class="relative flex items-center justify-center">
+                        <!-- Outer glow -->
+                        <div class="absolute inset-0 animate-ping rounded-full bg-blue-400 opacity-20 duration-[3000ms]"></div>
+                        <!-- Marker body -->
+                        <div class="z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 shadow-lg transition-transform hover:scale-110">
+                            <span class="text-xs">🏥</span>
+                        </div>
+                    </div>
+                `;
+            }
 
             const marker = new mapboxgl.Marker(el)
                 .setLngLat([resource.lng, resource.lat])
@@ -53,7 +75,7 @@ export default function ResourceMarkers({ map, resources }: Props) {
             markersRef.current.forEach(m => m.remove());
             markersRef.current = [];
         };
-    }, [map, resources]);
+    }, [map, resources, isCrisisMode]);
 
     return null;
 }

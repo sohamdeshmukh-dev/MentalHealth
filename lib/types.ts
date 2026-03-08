@@ -8,6 +8,8 @@ export interface CheckIn {
   lat: number;
   lng: number;
   city: string;
+  hugs?: number;
+  campus_name?: string;
 }
 
 export interface Resource {

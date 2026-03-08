@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Mood, CheckIn } from "@/lib/types";
 
 const EmotionWheelSelector = dynamic(
@@ -27,6 +27,12 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (selectedMood === "Overwhelmed" || selectedMood === "Sad") {
+      window.dispatchEvent(new CustomEvent("crisis_alert"));
+    }
+  }, [selectedMood]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,6 +69,15 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
       </h2>
 
       <EmotionWheelSelector value={selectedMood} onChange={setSelectedMood} />
+
+      {(selectedMood === "Overwhelmed" || selectedMood === "Sad") && (
+        <div className="mt-2 rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-center shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+          <p className="text-sm font-semibold text-red-400">You are not alone. Help is available.</p>
+          <a href="tel:988" className="mt-2 inline-block rounded border border-red-500 bg-red-600/20 px-4 py-1.5 text-xs font-bold tracking-wide text-red-200 hover:bg-red-500 hover:text-white transition">
+            Call or Text 988 Crisis Lifeline
+          </a>
+        </div>
+      )}
 
       <textarea
         value={message}

@@ -9,6 +9,7 @@ import { buildCityMask } from "@/lib/cityMask";
 import MoodHeatmap from "./MoodHeatmap";
 import ResourceMarkers from "./ResourceMarkers";
 import { getResourcesByCity } from "@/lib/store";
+import { CAMPUSES } from "@/lib/campusDetection";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -43,9 +44,10 @@ const CIRCLE_COLOR_STOPS = MOODS.flatMap((m) => [m.label, m.color]);
 interface Map3DViewProps {
   checkins: CheckIn[];
   city: CityConfig;
+  focusedCampus?: string;
 }
 
-export default function Map3DView({ checkins, city }: Map3DViewProps) {
+export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
@@ -283,6 +285,21 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
 
+    if (focusedCampus) {
+      const campus = CAMPUSES.find((c) => c.name === focusedCampus);
+      if (campus) {
+        map.flyTo({
+          center: [campus.lng, campus.lat],
+          zoom: 15,
+          pitch: 70,
+          bearing: 0,
+          duration: 2200,
+          essential: true,
+        });
+        return;
+      }
+    }
+
     map.flyTo({
       center: [city.lng, city.lat],
       zoom: 12,
@@ -294,7 +311,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
 
     const maskSrc = map.getSource("city-mask") as mapboxgl.GeoJSONSource | undefined;
     if (maskSrc) maskSrc.setData(buildCityMask(city));
-  }, [city]);
+  }, [city, focusedCampus]);
 
   // ── Update mood data (both sources) ──────────────────────────
   useEffect(() => {
