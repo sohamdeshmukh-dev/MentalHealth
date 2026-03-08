@@ -58,7 +58,8 @@ export default function Sidebar({
           </p>
         ) : (
           <ul className="mt-2 space-y-1.5">
-            {checkins.slice(0, 12).map((c) => (
+            {(Array.isArray(checkins) ? checkins : []).slice(0, 12).map((c) => (
+
               <li
                 key={c.id}
                 className="rounded-xl border border-slate-800 bg-slate-900/70 p-2.5"

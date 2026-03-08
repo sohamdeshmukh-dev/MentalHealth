@@ -17,10 +17,16 @@ export default function Home() {
   const [userLng, setUserLng] = useState<number | null>(null);
   const city = CITIES[cityIndex];
 
-  const fetchCheckins = useCallback(() => {
-    fetch(`/api/checkins?city=${encodeURIComponent(city.name)}`)
-      .then((res) => res.json())
-      .then((data) => setCheckins(data));
+  const fetchCheckins = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/checkins?city=${encodeURIComponent(city.name)}`);
+      if (!res.ok) throw new Error("Fetch failed");
+      const data = await res.json();
+      setCheckins(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load checkins:", err);
+      setCheckins([]);
+    }
   }, [city.name]);
 
   useEffect(() => {

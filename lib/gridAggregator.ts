@@ -88,9 +88,11 @@ export function buildSkylineGeoJSON(data: CheckIn[]): GeoJSON.FeatureCollection 
  * Flat point GeoJSON for the heatmap layer (unchanged from before).
  */
 export function buildPointGeoJSON(data: CheckIn[]): GeoJSON.FeatureCollection {
+  const safeData = Array.isArray(data) ? data : [];
+
   return {
     type: "FeatureCollection",
-    features: data.map((c) => ({
+    features: safeData.map((c) => ({
       type: "Feature" as const,
       properties: {
         mood: c.mood,

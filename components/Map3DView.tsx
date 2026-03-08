@@ -56,7 +56,12 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
     []
   );
   const pointData = useCallback(
-    (d: CheckIn[]) => buildPointGeoJSON(d),
+    (d: CheckIn[]) => {
+      if (!Array.isArray(d) || d.length === 0) {
+        return { type: "FeatureCollection" as const, features: [] };
+      }
+      return buildPointGeoJSON(d);
+    },
     []
   );
 
@@ -66,10 +71,9 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/standard",
-      config: { basemap: { theme: "monochrome", lightPreset: "night" } },
+      style: "mapbox://styles/mapbox/dark-v11",
       center: [city.lng, city.lat],
-      zoom: 12,
+      zoom: 14,
       pitch: 60,
       bearing: -20,
       antialias: true,
@@ -128,23 +132,38 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         (l) => l.type === "symbol" && l.layout?.["text-field"]
       )?.id;
 
-      map.addLayer(
-        {
-          id: "3d-buildings",
-          source: "composite",
-          "source-layer": "building",
-          filter: ["==", "extrude", "true"],
-          type: "fill-extrusion",
-          minzoom: 13,
-          paint: {
-            "fill-extrusion-color": "#334155",
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": 0.55,
+      const add3DBuildings = () => {
+        if (!map.getSource("composite")) return;
+        if (map.getLayer("3d-buildings")) return;
+
+        map.addLayer(
+          {
+            id: "3d-buildings",
+            source: "composite",
+            "source-layer": "building",
+            filter: ["==", "extrude", "true"],
+            type: "fill-extrusion",
+            minzoom: 13,
+            paint: {
+              "fill-extrusion-color": "#2a2a2a",
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": ["get", "min_height"],
+              "fill-extrusion-opacity": 0.8,
+            },
           },
-        },
-        labelLayerId
-      );
+          labelLayerId
+        );
+      };
+
+      const waitForSource = (m: mapboxgl.Map, sourceId: string, cb: () => void) => {
+        if (m.getSource(sourceId)) {
+          cb();
+        } else {
+          m.once("sourcedata", () => waitForSource(m, sourceId, cb));
+        }
+      };
+
+      waitForSource(map, "composite", add3DBuildings);
 
       // ── Point source (for heatmap + circle layers) ──────────
       map.addSource("mood-points", {
@@ -158,40 +177,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
         data: skylineData(checkins),
       });
 
-      // ── Heatmap layer (ground glow) ─────────────────────────
-      map.addLayer(
-        {
-          id: "mood-heatmap",
-          type: "heatmap",
-          source: "mood-points",
-          maxzoom: 16,
-          paint: {
-            "heatmap-weight": ["get", "weight"],
-            "heatmap-intensity": [
-              "interpolate", ["linear"], ["zoom"],
-              8, 0.8,
-              13, 2.5,
-            ],
-            "heatmap-radius": [
-              "interpolate", ["linear"], ["zoom"],
-              8, 25,
-              13, 50,
-            ],
-            "heatmap-color": [
-              "interpolate", ["linear"], ["heatmap-density"],
-              0, "rgba(0,0,0,0)",
-              ...HEATMAP_COLOR_STOPS,
-              1, hexToRgba(MOODS_BY_STRESS[MOODS_BY_STRESS.length - 1].color, 0.9),
-            ],
-            "heatmap-opacity": [
-              "interpolate", ["linear"], ["zoom"],
-              10, 0.8,
-              15, 0.5,
-            ],
-          },
-        },
-        "3d-buildings"
-      );
+
 
       // ── Skyline extrusions (polygon grid → 3D columns) ──────
       map.addLayer(
@@ -313,6 +299,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
+    if (!Array.isArray(checkins) || checkins.length === 0) return;
 
     const ptSrc = map.getSource("mood-points") as mapboxgl.GeoJSONSource | undefined;
     if (ptSrc) ptSrc.setData(pointData(checkins));
@@ -324,7 +311,7 @@ export default function Map3DView({ checkins, city }: Map3DViewProps) {
   return (
     <>
       <div ref={containerRef} className="h-full w-full" />
-      <MoodHeatmap map={mapInstance} checkins={checkins} />
+      <MoodHeatmap map={mapInstance} checkins={checkins} selectedCity={city.name} />
     </>
   );
 }

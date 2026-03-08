@@ -7,12 +7,14 @@ import { checkinsToGeoJSON } from '@/lib/checkinsToGeoJSON';
 interface Props {
     map: mapboxgl.Map | null;
     checkins: CheckIn[];
+    selectedCity?: string | null;
+    selectedMood?: string | null;
 }
 
 const SOURCE_ID = 'mood-checkins';
-const LAYER_ID = 'mood-heatmap';
+const LAYER_ID = 'snap-heatmap';
 
-export default function MoodHeatmap({ map, checkins }: Props) {
+export default function MoodHeatmap({ map, checkins, selectedCity, selectedMood }: Props) {
     const initializedRef = useRef(false);
 
     useEffect(() => {
@@ -31,53 +33,41 @@ export default function MoodHeatmap({ map, checkins }: Props) {
                 data: geojson,
             });
 
-            map.addLayer({
-                id: LAYER_ID,
-                type: 'heatmap',
-                source: SOURCE_ID,
-                paint: {
-                    // Weight each point by mood severity
-                    'heatmap-weight': [
-                        'interpolate', ['linear'],
-                        ['get', 'weight'],
-                        0, 0,
-                        1, 1,
-                    ],
-                    // Intensity scales up as you zoom in
-                    'heatmap-intensity': [
-                        'interpolate', ['linear'],
-                        ['zoom'],
-                        0, 0.8,
-                        9, 2.5,
-                    ],
-                    // Snapchat-style: transparent core → yellow → orange → deep red
-                    'heatmap-color': [
-                        'interpolate', ['linear'],
-                        ['heatmap-density'],
-                        0, 'rgba(0,0,0,0)',
-                        0.15, 'rgba(255,230,0,0.4)',
-                        0.35, 'rgba(255,165,0,0.65)',
-                        0.6, 'rgba(255,60,0,0.85)',
-                        0.8, 'rgba(220,20,20,0.95)',
-                        1.0, 'rgba(180,0,50,1)',
-                    ],
-                    // Blob radius grows as you zoom in
-                    'heatmap-radius': [
-                        'interpolate', ['linear'],
-                        ['zoom'],
-                        0, 20,
-                        9, 50,
-                        14, 80,
-                    ],
-                    // Fade out heatmap at high zoom so individual markers show
-                    'heatmap-opacity': [
-                        'interpolate', ['linear'],
-                        ['zoom'],
-                        10, 1,
-                        14, 0.4,
-                    ],
-                },
-            });
+            if (!map.getLayer(LAYER_ID)) {
+                map.addLayer({
+                    id: LAYER_ID,
+                    type: 'heatmap',
+                    source: SOURCE_ID,
+                    paint: {
+                        'heatmap-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['heatmap-density'],
+                            0, 'rgba(33,102,172,0)',
+                            0.2, 'rgb(103,169,207)',
+                            0.4, 'rgb(209,229,240)',
+                            0.6, 'rgb(253,219,199)',
+                            0.8, 'rgb(239,138,98)',
+                            1, 'rgb(255,0,0)'
+                        ],
+                        'heatmap-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            10, 15,
+                            15, 40
+                        ],
+                        'heatmap-intensity': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            11, 1,
+                            15, 3
+                        ],
+                        'heatmap-opacity': 0.7
+                    },
+                });
+            }
 
             initializedRef.current = true;
         };
@@ -88,6 +78,31 @@ export default function MoodHeatmap({ map, checkins }: Props) {
             map.once('load', setup);
         }
     }, [map, checkins]);
+
+    useEffect(() => {
+        if (!map || !map.isStyleLoaded()) return;
+        if (!map.getLayer(LAYER_ID)) return;
+
+        // Build a Mapbox filter array dynamically
+        const filters: any[] = ['all']; // 'all' means ALL conditions must be true
+
+        if (selectedCity) {
+            // Looks for the "city" property in your GeoJSON features
+            filters.push(['==', ['get', 'city'], selectedCity]);
+        }
+
+        if (selectedMood) {
+            // Looks for the "mood" property in your GeoJSON features
+            filters.push(['==', ['get', 'mood'], selectedMood]);
+        }
+
+        // Apply the filter (if no city/mood selected, clear the filter to show all)
+        if (filters.length === 1) {
+            map.setFilter(LAYER_ID, null);
+        } else {
+            map.setFilter(LAYER_ID, filters);
+        }
+    }, [map, selectedMood, selectedCity]);
 
     return null;
 }
