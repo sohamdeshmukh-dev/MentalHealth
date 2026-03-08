@@ -80,6 +80,7 @@ Submit a new check-in.
 
 #Kaggle Datasets
 - https://www.kaggle.com/datasets/vkocaman/mentalhealthcentersinusa
+- https://catalog.data.gov/dataset/mental-health-treatement-facilities-locator
 
 ## License
 
