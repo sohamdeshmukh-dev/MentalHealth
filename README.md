@@ -1,96 +1,77 @@
 # MentalMap
 
-A 3D interactive mood heatmap platform where users can anonymously check in with how they're feeling across 10 major US cities. Built with a dark, calming UI designed for mental health awareness.
+A 3D interactive emotional skyline platform where stress reports rise from the map as vertical extrusions like skyscrapers, and mood data glows as a Snap Map-style heatmap across 10 major US cities.
 
 ## Features
 
-- **3D Map Visualization** -- Mapbox GL JS with terrain, 3D buildings, and globe projection
-- **Mood Heatmap** -- Topographical heatmap layer (cool blues = calm, warm reds = stressed) similar to Snapchat Snap Map
-- **Dark Mode UI** -- Full dark theme with soft accent colors and readable contrast
-- **10 City Support** -- New York City, Los Angeles, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, Jacksonville
-- **City Navigation** -- Arrow buttons and keyboard left/right arrows to switch between cities with smooth fly-to animations
-- **Feelings Check-In** -- Select a mood (Happy, Calm, Neutral, Stressed, Sad, Overwhelmed) and optionally write a short anonymous message
-- **Live Updates** -- Submitted moods appear immediately on the heatmap
-- **Tilt, Rotate, Zoom** -- Full 3D map controls with pitched camera angle and terrain exaggeration
-- **Recent Feed** -- Latest 12 anonymous check-ins shown per city in the sidebar
+- **3D Stress Skyline** -- Mood reports are aggregated into a spatial grid; each cell becomes a vertical column. Stressed/overwhelmed areas produce tall red/orange towers, calm/happy areas produce short blue/green pillars. Dense clusters stack taller.
+- **Snap Map Heatmap** -- Ground-level glow layer beneath the skyline columns. Cool blues for calm zones, warm reds for stressed zones, visible at all zoom levels.
+- **300-500 Demo Points Per City** -- Randomly generated clustered data with hot-zone bias so the skyline is immediately visible on load. Each city regenerates data when switching.
+- **Custom Light Map** -- Mapbox style `mapbox://styles/soso593/cmmh6jzoe003m01qn8f00gog6`.
+- **City Mask** -- Inverted polygon mask fades everything outside the city's urban boundary.
+- **Arrow Navigation** -- Left/right controls on the map + keyboard arrow keys to fly between cities.
+- **10 Supported Cities** -- NYC (default), LA, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, Jacksonville.
+- **Tilt, Rotate, Zoom** -- 60-degree pitch with terrain exaggeration for exploring the 3D skyline.
+- **Feelings Check-In** -- Select mood + optional anonymous message. New submissions appear as skyline columns and heatmap intensity in real time.
+
+## How the Skyline Works
+
+Raw check-in points are aggregated into a grid (`lib/gridAggregator.ts`). Each grid cell becomes a small polygon with:
+- **Height** = f(average stress weight, report density) -- more reports and higher stress = taller column
+- **Color** = interpolated from blue (calm) through green, yellow, orange, to red (overwhelmed)
+
+This solves the Mapbox limitation where `fill-extrusion` requires polygon geometry (points are silently ignored).
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS v4 (dark theme)
-- **Map:** Mapbox GL JS with 3D terrain and heatmap layers
-- **Backend:** Next.js API Routes with in-memory store
+- **Framework:** Next.js 16 (App Router) + TypeScript
+- **Styling:** Tailwind CSS v4
+- **Map:** Mapbox GL JS (3D terrain, fill-extrusion, heatmap layers)
+- **Geometry:** @turf/circle for city masks
+- **Backend:** Next.js API Routes + in-memory store with seed data
 
 ## Getting Started
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Add your Mapbox token to `.env.local`:
+```
+NEXT_PUBLIC_MAPBOX_TOKEN=pk.your_token_here
+```
 
-**Note:** You need a Mapbox access token. Replace the token in `components/Map3DView.tsx` with your own from [mapbox.com](https://www.mapbox.com/).
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Project Structure
 
 ```
 app/
-  api/checkins/route.ts     # GET/POST API (supports ?city= filter)
-  globals.css               # Dark theme styles + Mapbox overrides
-  layout.tsx                # Root layout (dark mode)
-  page.tsx                  # Homepage: sidebar + 3D map
+  api/checkins/route.ts     # GET/POST API (?city= filter)
+  globals.css               # Light theme + Mapbox overrides
+  layout.tsx                # Root layout
+  page.tsx                  # Sidebar + 3D map + navigator overlay
 components/
-  Map3DView.tsx             # Mapbox GL 3D map with heatmap + terrain
-  CityNavigator.tsx         # City switcher with arrow navigation
-  MoodForm.tsx              # Mood selection + anonymous message form
-  HeatmapLegend.tsx         # Calm-to-stressed color gradient legend
-  Sidebar.tsx               # Sidebar panel (navigator + form + feed)
+  Map3DView.tsx             # Mapbox 3D map: skyline extrusions, heatmap, mask
+  CityNavigator.tsx         # Arrow navigation overlay
+  MoodForm.tsx              # Mood selection + message form
+  HeatmapLegend.tsx         # Color gradient legend
+  Sidebar.tsx               # Sidebar panel
 lib/
-  store.ts                  # In-memory mock DB with seed data
-  types.ts                  # Types, mood config, city coordinates
-```
-
-## Supported Cities
-
-| City | State |
-|------|-------|
-| New York City | NY |
-| Los Angeles | CA |
-| Chicago | IL |
-| Houston | TX |
-| Phoenix | AZ |
-| Philadelphia | PA |
-| San Antonio | TX |
-| San Diego | CA |
-| Dallas | TX |
-| Jacksonville | FL |
-
-## API
-
-### `GET /api/checkins?city=New+York+City`
-Returns check-ins filtered by city (or all if no city param).
-
-### `POST /api/checkins`
-```json
-{
-  "mood": "Stressed",
-  "message": "Long day at work",
-  "city": "Chicago"
-}
+  gridAggregator.ts         # Aggregates points into polygon grid for extrusions
+  cityMask.ts               # Inverted polygon mask per city
+  store.ts                  # In-memory DB with 300-500 clustered seed points/city
+  types.ts                  # Types, moods, city configs
 ```
 
 ## Future Improvements
 
-- **Persistent Database** -- Replace in-memory store with Firebase or Supabase
-- **Sentiment Analysis** -- Analyze message text to detect crisis signals
-- **Crisis Resource Suggestions** -- Auto-suggest hotlines when negative moods are detected
-- **Time-Based Heatmap** -- Animate mood data over time
-- **Mobile Responsive** -- Collapsible sidebar for mobile views
+- Persistent database (Firebase / Supabase)
+- Sentiment analysis on messages
+- Crisis resource auto-suggestions
+- Time-animated heatmap playback
+- Mobile-responsive layout
 
 #Kaggle Datasets
 - https://www.kaggle.com/datasets/vkocaman/mentalhealthcentersinusa

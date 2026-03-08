@@ -1,6 +1,6 @@
 "use client";
 
-import { CITIES, CityConfig } from "@/lib/types";
+import { CITIES } from "@/lib/types";
 
 interface CityNavigatorProps {
   currentIndex: number;
@@ -11,7 +11,7 @@ export default function CityNavigator({
   currentIndex,
   onNavigate,
 }: CityNavigatorProps) {
-  const city: CityConfig = CITIES[currentIndex];
+  const city = CITIES[currentIndex];
 
   function prev() {
     onNavigate((currentIndex - 1 + CITIES.length) % CITIES.length);
@@ -22,33 +22,33 @@ export default function CityNavigator({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-sm">
+    <div className="flex items-center gap-3">
       <button
         onClick={prev}
         aria-label="Previous city"
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-md backdrop-blur transition-all hover:bg-white hover:shadow-lg active:scale-95"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+          <path d="M10 12L6 8L10 4" stroke="#334155" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
-      <div className="flex flex-col items-center">
-        <span className="text-sm font-semibold text-white">
+      <div className="flex flex-col items-center rounded-xl bg-white/90 px-5 py-1.5 shadow-md backdrop-blur">
+        <span className="text-sm font-bold text-slate-800">
           {city.name}
         </span>
-        <span className="text-[11px] text-slate-500">
-          {city.state} &middot; {currentIndex + 1}/{CITIES.length}
+        <span className="text-[10px] font-medium text-slate-400">
+          {city.state} &middot; {currentIndex + 1} / {CITIES.length}
         </span>
       </div>
 
       <button
         onClick={next}
         aria-label="Next city"
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-md backdrop-blur transition-all hover:bg-white hover:shadow-lg active:scale-95"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+          <path d="M6 4L10 8L6 12" stroke="#334155" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
     </div>

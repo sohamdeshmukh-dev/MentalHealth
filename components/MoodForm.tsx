@@ -41,7 +41,7 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-300">
+      <h2 className="text-sm font-semibold text-slate-700">
         How are you feeling?
       </h2>
 
@@ -53,12 +53,12 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
             onClick={() => setSelectedMood(m.label)}
             className={`flex flex-col items-center gap-1 rounded-lg border p-2.5 text-xs transition-all ${
               selectedMood === m.label
-                ? "border-indigo-500/60 bg-indigo-500/15 shadow-sm shadow-indigo-500/20"
-                : "border-white/8 bg-white/5 hover:border-white/15 hover:bg-white/8"
+                ? "border-indigo-400 bg-indigo-50 shadow-sm"
+                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
             }`}
           >
             <span className="text-xl">{m.icon}</span>
-            <span className="text-slate-400">{m.label}</span>
+            <span className="text-slate-600">{m.label}</span>
           </button>
         ))}
       </div>
@@ -69,7 +69,7 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
         placeholder="Share how you're feeling (optional)..."
         maxLength={280}
         rows={2}
-        className="w-full rounded-lg border border-white/8 bg-white/5 p-2.5 text-sm text-slate-300 placeholder-slate-600 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+        className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
       />
 
       <button
@@ -81,7 +81,7 @@ export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
       </button>
 
       {success && (
-        <p className="text-center text-xs text-emerald-400">
+        <p className="text-center text-xs text-emerald-600">
           Thank you for sharing.
         </p>
       )}

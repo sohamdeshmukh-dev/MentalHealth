@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
+import CityNavigator from "@/components/CityNavigator";
 import { CheckIn, CITIES } from "@/lib/types";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
@@ -29,8 +30,7 @@ export default function Home() {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") {
         setCityIndex((i) => (i - 1 + CITIES.length) % CITIES.length);
-      } else if (e.key === "ArrowRight" || e.key === "Tab") {
-        e.preventDefault();
+      } else if (e.key === "ArrowRight") {
         setCityIndex((i) => (i + 1) % CITIES.length);
       }
     }
@@ -43,27 +43,31 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-[#08081a]">
+    <div className="flex h-screen w-screen bg-[#f4f3f8]">
       {/* Sidebar */}
-      <div className="w-[360px] shrink-0 border-r border-white/5">
+      <div className="w-[360px] shrink-0 border-r border-slate-200">
         <Sidebar
           checkins={checkins}
           cityIndex={cityIndex}
-          onCityChange={setCityIndex}
           onNewCheckin={handleNewCheckin}
         />
       </div>
 
-      {/* 3D Map */}
+      {/* Map area */}
       <div className="relative flex-1">
         <Map3DView checkins={checkins} city={city} />
 
-        {/* City label overlay */}
+        {/* City navigator overlay — centered at top */}
+        <div className="pointer-events-auto absolute left-1/2 top-5 z-10 -translate-x-1/2">
+          <CityNavigator currentIndex={cityIndex} onNavigate={setCityIndex} />
+        </div>
+
+        {/* City label bottom-left */}
         <div className="pointer-events-none absolute bottom-6 left-6">
-          <p className="text-2xl font-bold text-white/80 drop-shadow-lg">
+          <p className="text-2xl font-bold text-slate-700 drop-shadow-sm">
             {city.name}
           </p>
-          <p className="text-sm text-white/40">{city.state}</p>
+          <p className="text-sm text-slate-400">{city.state}</p>
         </div>
       </div>
     </div>

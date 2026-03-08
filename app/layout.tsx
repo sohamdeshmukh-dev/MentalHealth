@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MentalMap - 3D Mood Heatmap",
+  title: "MentalMap - 3D Emotional Skyline",
   description:
-    "Interactive 3D map with anonymous mood check-ins and community heatmaps across major US cities.",
+    "Interactive 3D mood heatmap with stress skyline visualization across 10 major US cities.",
 };
 
 export default function RootLayout({
@@ -24,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#08081a] text-slate-200`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f4f3f8] text-slate-800`}
       >
         {children}
       </body>
