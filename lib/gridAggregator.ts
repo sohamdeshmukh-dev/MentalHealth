@@ -6,19 +6,6 @@ import { CheckIn, MOODS } from "./types";
  */
 const CELL_SIZE = 0.0012;
 
-interface GridCell {
-  /** Average weight (0-1, higher = more stressed) */
-  weight: number;
-  /** Number of reports in this cell */
-  count: number;
-  /** Center lat */
-  lat: number;
-  /** Center lng */
-  lng: number;
-  /** Dominant mood label */
-  mood: string;
-}
-
 /**
  * Aggregate check-in points into a grid, then emit each cell as a small
  * square polygon with properties for height & color.
