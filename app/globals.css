@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #08081a;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -20,7 +20,49 @@ body {
   overflow: hidden;
 }
 
-/* Leaflet popup overrides */
-.leaflet-popup-content-wrapper {
-  border-radius: 8px !important;
+/* Mapbox dark popup */
+.mapboxgl-popup-content {
+  background: #1e1b4b !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: #1e1b4b !important;
+}
+
+.mapboxgl-popup-close-button {
+  color: #94a3b8 !important;
+  font-size: 16px !important;
+}
+
+/* Navigation controls dark theme */
+.mapboxgl-ctrl-group {
+  background: rgba(15, 15, 35, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(8px);
+}
+
+.mapboxgl-ctrl-group button {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.mapboxgl-ctrl-group button span {
+  filter: invert(0.8);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
 }

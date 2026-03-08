@@ -7,60 +7,34 @@ export interface CheckIn {
   timestamp: string;
   lat: number;
   lng: number;
+  city: string;
 }
 
-export interface Resource {
-  id: string;
+export interface CityConfig {
   name: string;
-  type: "Hotline" | "Clinic" | "Support Group" | "Online";
-  description: string;
-  phone?: string;
+  state: string;
   lat: number;
   lng: number;
 }
 
-export const MOODS: { label: Mood; color: string; icon: string }[] = [
-  { label: "Happy", color: "#22c55e", icon: "😊" },
-  { label: "Calm", color: "#3b82f6", icon: "😌" },
-  { label: "Neutral", color: "#a855f7", icon: "😐" },
-  { label: "Stressed", color: "#f97316", icon: "😰" },
-  { label: "Sad", color: "#6366f1", icon: "😢" },
-  { label: "Overwhelmed", color: "#ef4444", icon: "😵" },
+export const MOODS: { label: Mood; color: string; heatColor: string; icon: string; weight: number }[] = [
+  { label: "Happy", color: "#34d399", heatColor: "#06b6d4", icon: "😊", weight: 0.2 },
+  { label: "Calm", color: "#60a5fa", heatColor: "#3b82f6", icon: "😌", weight: 0.1 },
+  { label: "Neutral", color: "#a78bfa", heatColor: "#8b5cf6", icon: "😐", weight: 0.4 },
+  { label: "Stressed", color: "#fb923c", heatColor: "#f97316", icon: "😰", weight: 0.7 },
+  { label: "Sad", color: "#818cf8", heatColor: "#ef4444", icon: "😢", weight: 0.8 },
+  { label: "Overwhelmed", color: "#f87171", heatColor: "#dc2626", icon: "😵", weight: 1.0 },
 ];
 
-export const SAMPLE_RESOURCES: Resource[] = [
-  {
-    id: "r1",
-    name: "Crisis Text Line",
-    type: "Hotline",
-    description: "Text HOME to 741741 for free, 24/7 crisis counseling.",
-    phone: "741741",
-    lat: 40.7128,
-    lng: -74.006,
-  },
-  {
-    id: "r2",
-    name: "NAMI Helpline",
-    type: "Hotline",
-    description: "Free information, referrals, and support for mental health.",
-    phone: "1-800-950-6264",
-    lat: 40.7580,
-    lng: -73.9855,
-  },
-  {
-    id: "r3",
-    name: "Community Wellness Center",
-    type: "Clinic",
-    description: "Walk-in mental health clinic with sliding-scale fees.",
-    lat: 40.7282,
-    lng: -73.7949,
-  },
-  {
-    id: "r4",
-    name: "Mindful Peers",
-    type: "Support Group",
-    description: "Weekly peer support groups for anxiety and depression.",
-    lat: 40.6892,
-    lng: -74.0445,
-  },
+export const CITIES: CityConfig[] = [
+  { name: "New York City", state: "NY", lat: 40.7128, lng: -74.006 },
+  { name: "Los Angeles", state: "CA", lat: 34.0522, lng: -118.2437 },
+  { name: "Chicago", state: "IL", lat: 41.8781, lng: -87.6298 },
+  { name: "Houston", state: "TX", lat: 29.7604, lng: -95.3698 },
+  { name: "Phoenix", state: "AZ", lat: 33.4484, lng: -112.074 },
+  { name: "Philadelphia", state: "PA", lat: 39.9526, lng: -75.1652 },
+  { name: "San Antonio", state: "TX", lat: 29.4241, lng: -98.4936 },
+  { name: "San Diego", state: "CA", lat: 32.7157, lng: -117.1611 },
+  { name: "Dallas", state: "TX", lat: 32.7767, lng: -96.797 },
+  { name: "Jacksonville", state: "FL", lat: 30.3322, lng: -81.6557 },
 ];
