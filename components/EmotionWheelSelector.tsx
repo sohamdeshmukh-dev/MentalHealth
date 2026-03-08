@@ -23,11 +23,15 @@ const CENTER = VIEWBOX_SIZE / 2;
 const OUTER_RADIUS = 150;
 const INNER_RADIUS = 70;
 
+function roundSvg(value: number) {
+  return Number(value.toFixed(6));
+}
+
 function polarToCartesian(angleDeg: number, radius: number) {
   const radians = (angleDeg - 90) * (Math.PI / 180);
   return {
-    x: CENTER + radius * Math.cos(radians),
-    y: CENTER + radius * Math.sin(radians),
+    x: roundSvg(CENTER + radius * Math.cos(radians)),
+    y: roundSvg(CENTER + radius * Math.sin(radians)),
   };
 }
 
@@ -40,9 +44,9 @@ function segmentPath(startAngle: number, endAngle: number) {
 
   return [
     `M ${outerStart.x} ${outerStart.y}`,
-    `A ${OUTER_RADIUS} ${OUTER_RADIUS} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `A ${roundSvg(OUTER_RADIUS)} ${roundSvg(OUTER_RADIUS)} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
     `L ${innerEnd.x} ${innerEnd.y}`,
-    `A ${INNER_RADIUS} ${INNER_RADIUS} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+    `A ${roundSvg(INNER_RADIUS)} ${roundSvg(INNER_RADIUS)} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
     "Z",
   ].join(" ");
 }
@@ -89,6 +93,26 @@ export default function EmotionWheelSelector({
   );
   const [hoveredMood, setHoveredMood] = useState<Mood | null>(null);
 
+  const segments = useMemo(
+    () =>
+      moods.map((mood, index) => {
+        const startAngle = index * SEGMENT_ANGLE - SEGMENT_ANGLE / 2;
+        const endAngle = startAngle + SEGMENT_ANGLE;
+        const labelPos = polarToCartesian(
+          startAngle + SEGMENT_ANGLE / 2,
+          (OUTER_RADIUS + INNER_RADIUS) / 2
+        );
+
+        return {
+          mood,
+          index,
+          labelPos,
+          path: segmentPath(startAngle, endAngle),
+        };
+      }),
+    [moods]
+  );
+
   function selectMood(mood: Mood, index: number) {
     onChange(mood);
     const targetRotation = -index * SEGMENT_ANGLE;
@@ -114,14 +138,7 @@ export default function EmotionWheelSelector({
               transition: "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
-            {moods.map((mood, index) => {
-              const startAngle = index * SEGMENT_ANGLE - SEGMENT_ANGLE / 2;
-              const endAngle = startAngle + SEGMENT_ANGLE;
-              const labelAngle = startAngle + SEGMENT_ANGLE / 2;
-              const labelPos = polarToCartesian(
-                labelAngle,
-                (OUTER_RADIUS + INNER_RADIUS) / 2
-              );
+            {segments.map(({ mood, index, labelPos, path }) => {
               const isHovered = hoveredMood === mood.label;
               const isSelected = value === mood.label;
               const scale = isHovered ? 1.06 : isSelected ? 1.025 : 1;
@@ -161,7 +178,7 @@ export default function EmotionWheelSelector({
                   }}
                 >
                   <path
-                    d={segmentPath(startAngle, endAngle)}
+                    d={path}
                     fill={mood.color}
                     stroke={
                       isSelected ? "rgba(248,250,252,0.96)" : "rgba(2,6,23,0.6)"

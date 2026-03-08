@@ -1,6 +1,7 @@
 import { CheckIn, CITIES, MOODS, CityConfig } from "./types";
 
 const checkins: CheckIn[] = [];
+let seeded = false;
 
 /**
  * Generate 300-500 clustered demo points per city so the skyline
@@ -46,16 +47,21 @@ function generateCityData(city: CityConfig) {
   }
 }
 
-// Seed all cities
-CITIES.forEach(generateCityData);
+function ensureSeeded() {
+  if (seeded) return;
+  CITIES.forEach(generateCityData);
+  seeded = true;
+}
 
 export function getAllCheckIns(): CheckIn[] {
+  ensureSeeded();
   return [...checkins].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 }
 
 export function getCheckInsByCity(city: string): CheckIn[] {
+  ensureSeeded();
   return checkins
     .filter((c) => c.city === city)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

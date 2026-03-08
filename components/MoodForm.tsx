@@ -1,8 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Mood, CheckIn } from "@/lib/types";
-import EmotionWheelSelector from "./EmotionWheelSelector";
+
+const EmotionWheelSelector = dynamic(
+  () => import("./EmotionWheelSelector"),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="relative mx-auto aspect-square w-full max-w-[320px] rounded-full border border-slate-700 bg-slate-900/70"
+        aria-hidden
+      />
+    ),
+  }
+);
 
 interface MoodFormProps {
   cityName: string;
