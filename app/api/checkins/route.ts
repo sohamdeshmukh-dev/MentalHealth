@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addCheckIn, getAllCheckIns, getCheckInsByCity } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { CheckIn, Mood, MOODS, CITIES } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
-  if (city) {
-    return NextResponse.json(getCheckInsByCity(city));
-  }
-  return NextResponse.json(getAllCheckIns());
+
+  const query = supabase
+    .from("checkins")
+    .select("*")
+    .order("timestamp", { ascending: false })
+    .limit(50);
+
+  if (city) query.eq("city", city);
+
+  const { data, error } = await query;
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 export async function POST(request: Request) {
@@ -36,6 +45,8 @@ export async function POST(request: Request) {
     city: targetCity.name,
   };
 
-  addCheckIn(entry);
+  const { error } = await supabase.from("checkins").insert([entry]);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(entry, { status: 201 });
 }
