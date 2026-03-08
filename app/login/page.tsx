@@ -7,16 +7,26 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
     const router = useRouter();
 
-    const handleEmailLogin = async (e: React.FormEvent) => {
+    const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (!error) {
-            router.push('/');
+        if (isSignUp) {
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (!error) {
+                router.push('/');
+            } else {
+                console.error(error);
+            }
         } else {
-            console.error(error);
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (!error) {
+                router.push('/');
+            } else {
+                console.error(error);
+            }
         }
         setLoading(false);
     };
@@ -29,9 +39,11 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-[#050913] p-4 text-slate-200">
             <div className="w-full max-w-md rounded-[24px] border border-slate-800 bg-[#0A0F1C] p-8 shadow-2xl">
                 <h1 className="mb-2 text-2xl font-bold text-white">MentalMap Dashboard</h1>
-                <p className="mb-8 text-sm text-slate-400">Sign in to access anonymous location-based analytics.</p>
+                <p className="mb-8 text-sm text-slate-400">
+                    {isSignUp ? 'Create an account to join the anonymous network.' : 'Sign in to access anonymous location-based analytics.'}
+                </p>
 
-                <form onSubmit={handleEmailLogin} className="space-y-4">
+                <form onSubmit={handleEmailAuth} className="space-y-4">
                     <div>
                         <label className="mb-1 block text-sm font-medium text-slate-300">Email Address</label>
                         <input
@@ -60,25 +72,37 @@ export default function LoginPage() {
                         />
                     </div>
 
-                    <div className="flex items-center">
-                        <input
-                            id="remember-me"
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
-                        />
-                        <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-400">
-                            Remember me
-                        </label>
-                    </div>
+                    {!isSignUp && (
+                        <div className="flex items-center">
+                            <input
+                                id="remember-me"
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                            />
+                            <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-400">
+                                Remember me
+                            </label>
+                        </div>
+                    )}
 
                     <button
                         type="submit"
                         disabled={loading}
                         className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-50"
                     >
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign Up' : 'Sign In')}
                     </button>
                 </form>
+
+                <p className="mt-4 text-center text-sm text-slate-400">
+                    {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                    <button
+                        onClick={() => setIsSignUp(!isSignUp)}
+                        className="font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none"
+                    >
+                        {isSignUp ? 'Sign In' : 'Sign Up'}
+                    </button>
+                </p>
 
                 <div className="relative mt-8">
                     <div className="absolute inset-0 flex items-center">
