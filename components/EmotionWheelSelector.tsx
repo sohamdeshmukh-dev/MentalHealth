@@ -141,12 +141,17 @@ export default function EmotionWheelSelector({
             {segments.map(({ mood, index, labelPos, path }) => {
               const isHovered = hoveredMood === mood.label;
               const isSelected = value === mood.label;
-              const scale = isHovered ? 1.06 : isSelected ? 1.025 : 1;
+              const scale = isHovered ? 1.06 : isSelected ? 1.04 : 1;
+              const brightness = isHovered ? 1.14 : isSelected ? 1.1 : 1;
               const glow = isHovered
                 ? `drop-shadow(0 0 14px ${hexToRgba(mood.color, 0.75)})`
                 : isSelected
                   ? `drop-shadow(0 0 9px ${hexToRgba(mood.color, 0.55)})`
                   : "none";
+              const filter =
+                glow === "none"
+                  ? `brightness(${brightness})`
+                  : `brightness(${brightness}) ${glow}`;
 
               return (
                 <g
@@ -155,6 +160,7 @@ export default function EmotionWheelSelector({
                   tabIndex={0}
                   aria-label={`Select ${mood.label}`}
                   onClick={() => selectMood(mood.label, index)}
+                  onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setHoveredMood(mood.label)}
                   onMouseLeave={() =>
                     setHoveredMood((current) =>
@@ -174,49 +180,55 @@ export default function EmotionWheelSelector({
                     transformOrigin: `${CENTER}px ${CENTER}px`,
                     transform: `scale(${scale})`,
                     transition: "transform 180ms ease, filter 180ms ease",
-                    filter: glow,
+                    filter,
+                    outline: "none",
                   }}
                 >
                   <path
                     d={path}
                     fill={mood.color}
-                    stroke={
-                      isSelected ? "rgba(248,250,252,0.96)" : "rgba(2,6,23,0.6)"
-                    }
-                    strokeWidth={isSelected ? 3 : 1.5}
+                    stroke="rgba(2,6,23,0.6)"
+                    strokeWidth={1.5}
                   />
 
-                  <text
-                    x={labelPos.x}
-                    y={labelPos.y - 8}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="#ffffff"
-                    fontSize="15"
-                    fontWeight={700}
+                  <g
                     style={{
+                      transformOrigin: `${labelPos.x}px ${labelPos.y}px`,
+                      transform: `rotate(${-rotation}deg)`,
+                      transition: "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
                       pointerEvents: "none",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.45)",
                     }}
                   >
-                    {mood.icon}
-                  </text>
-                  <text
-                    x={labelPos.x}
-                    y={labelPos.y + 11}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="#ffffff"
-                    fontSize="10"
-                    fontWeight={700}
-                    style={{
-                      pointerEvents: "none",
-                      letterSpacing: "0.2px",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.45)",
-                    }}
-                  >
-                    {mood.label}
-                  </text>
+                    <text
+                      x={labelPos.x}
+                      y={labelPos.y - 8}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="#ffffff"
+                      fontSize="15"
+                      fontWeight={700}
+                      style={{
+                        textShadow: "0 1px 2px rgba(0,0,0,0.45)",
+                      }}
+                    >
+                      {mood.icon}
+                    </text>
+                    <text
+                      x={labelPos.x}
+                      y={labelPos.y + 11}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="#ffffff"
+                      fontSize="10"
+                      fontWeight={700}
+                      style={{
+                        letterSpacing: "0.2px",
+                        textShadow: "0 1px 2px rgba(0,0,0,0.45)",
+                      }}
+                    >
+                      {mood.label}
+                    </text>
+                  </g>
                 </g>
               );
             })}
