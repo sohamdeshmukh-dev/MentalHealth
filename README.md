@@ -1,16 +1,28 @@
 #To-Do List
 -Real-Time Emotional Weather 
+
 -Safe Spaces Finder
+
 -Mood Journey Tracking
+
 -Anonymous Community Checkins
+
 -AI Therapist
+
 -AI mood Prediction(Individual/Community)
+
 -Daily AI Reflection(With Image)
+
 -Suggest Breathing and mediation tools
+
 -Mental Health Score(Sentiment Anaylsis)
+
 -Crisis Detection, suggest future activities
+
 -Emotion time Machine(move a time slider on the map)
+
 -Friends Tab
+
 -Stripe(monthly subscription)
 
 
