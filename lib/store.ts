@@ -38,7 +38,7 @@ function generateCityData(city: CityConfig) {
         id: `seed-${city.name}-${c}-${i}`,
         mood: mood.label,
         message: "",
-        timestamp: new Date(now - Math.random() * 86400000).toISOString(),
+        timestamp: now - Math.random() * 86400000,
         lat: cLat + spreadLat,
         lng: cLng + spreadLng,
         city: city.name,
