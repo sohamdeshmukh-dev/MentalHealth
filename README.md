@@ -170,6 +170,8 @@ Watch emotional patterns shift.
 
 22) UI section roller at the top of the screen to switch tabs from mood section and friends
 
+23) Add an integration for college students to see their colleges on the map and their specific data sets for the college
+
 
 # MentalMap
 
