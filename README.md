@@ -83,6 +83,8 @@ People can post anonymous emotional check-ins on the map.
 
 13) Stripe(monthly subscription)
 
+14) Login Page OAuth(Google, Facebook)
+
 
 # MentalMap
 
