@@ -1,6 +1,6 @@
 #To-Do List
 
--Real-Time Emotional Weather 
+1) Real-Time Emotional Weather 
 
 Examples:
 	•	Anxiety → storm clouds
@@ -22,8 +22,7 @@ Tech:
 	•	Mapbox layers
 	•	WebGL overlays
 
-
--Safe Spaces Finder
+2) Safe Spaces Finder
 
 Show places where people feel mentally safe.
 
@@ -42,7 +41,7 @@ Users can tag locations with:
 "good for studying"
 "stressful"
 
--Mood Journey Tracking
+3) Mood Journey Tracking
 Let users see their emotional patterns over time.
 
 Example dashboard:
@@ -61,28 +60,28 @@ Then AI insights:
 
 “You tend to feel stressed near the library during exam weeks.”
 
--Anonymous Community Checkins
+4) Anonymous Community Checkins
 
 People can post anonymous emotional check-ins on the map.
 
 
--AI Therapist
+5) AI Therapist
 
--AI mood Prediction(Individual/Community)
+6) AI mood Prediction(Individual/Community)
 
--Daily AI Reflection(With Image)
+7) Daily AI Reflection(With Image)
 
--Suggest Breathing and mediation tools
+8) Suggest Breathing and mediation tools
 
--Mental Health Score(Sentiment Anaylsis)
+9) Mental Health Score(Sentiment Anaylsis)
 
--Crisis Detection, suggest future activities
+10) Crisis Detection, suggest future activities
 
--Emotion time Machine(move a time slider on the map)
+11) Emotion time Machine(move a time slider on the map)
 
--Friends Tab
+12) Friends Tab
 
--Stripe(monthly subscription)
+13) Stripe(monthly subscription)
 
 
 # MentalMap
