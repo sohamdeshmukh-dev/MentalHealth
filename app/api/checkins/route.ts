@@ -4,6 +4,28 @@ import { CheckIn, Mood, MOODS, CITIES } from "@/lib/types";
 import { detectCampus } from "@/lib/campusDetection";
 import { v4 as uuidv4 } from "uuid";
 
+async function insertCheckinWithSchemaFallback(entry: CheckIn) {
+  const payload: Record<string, unknown> = { ...entry };
+  const triedMissingCols = new Set<string>();
+
+  for (let i = 0; i < 4; i++) {
+    const { error } = await supabase.from("checkins").insert([payload]);
+    if (!error) return null;
+
+    const missingColMatch = error.message?.match(/Could not find the '([^']+)' column/);
+    const missingCol = missingColMatch?.[1];
+
+    if (!missingCol || triedMissingCols.has(missingCol) || !(missingCol in payload)) {
+      return error;
+    }
+
+    triedMissingCols.add(missingCol);
+    delete payload[missingCol];
+  }
+
+  return { message: "Insert failed after schema fallback attempts." };
+}
+
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
 
@@ -52,8 +74,13 @@ export async function POST(request: Request) {
     campus_name: campus?.name,
   };
 
-  const { error } = await supabase.from("checkins").insert([entry]);
+  const error = await insertCheckinWithSchemaFallback(entry);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json(
+      { error: error.message ?? "Unable to insert check-in." },
+      { status: 500 }
+    );
+  }
   return NextResponse.json(entry, { status: 201 });
 }
