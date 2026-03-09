@@ -166,6 +166,10 @@ Watch emotional patterns shift.
 
 20) Login Page OAuth(Google, Facebook)
 
+21)Weather forecast(slider)
+
+22) UI section roller at the top of the screen to switch tabs from mood section and friends
+
 
 # MentalMap
 
