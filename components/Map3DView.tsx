@@ -10,6 +10,9 @@ import MoodHeatmap from "./MoodHeatmap";
 import ResourceMarkers from "./ResourceMarkers";
 import { getResourcesByCity } from "@/lib/store";
 import { CAMPUSES } from "@/lib/campusDetection";
+import { supabase } from "@/lib/supabase";
+import AddSafeSpaceModal from "./AddSafeSpaceModal";
+import { seedRealSafeSpaces } from "@/utils/seedSafeSpaces";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -55,6 +58,9 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
   const readyRef = useRef(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const spinFrameRef = useRef<number | null>(null);
+  const [draftSafeSpace, setDraftSafeSpace] = useState<{ lat: number; lng: number } | null>(null);
+  const safeSpacesRefetchRef = useRef<() => void>(() => { });
+  const [isSeedingSpaces, setIsSeedingSpaces] = useState(false);
 
   // Memoised builders
   const skylineData = useCallback(
@@ -274,6 +280,12 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
         });
       }
 
+      // Right-click to open draft modal
+      map.on("contextmenu", (e) => {
+        e.preventDefault();
+        setDraftSafeSpace({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      });
+
       readyRef.current = true;
     });
 
@@ -464,11 +476,214 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
     };
   }, [isSpinning]);
 
+  // ── Safe Spaces: Native WebGL layers (zero-drift, ADDITIVE / ISOLATED) ──
+
+  // Inject dark popup CSS once
+  if (typeof document !== "undefined" && !document.getElementById("safe-space-popup-style")) {
+    const s = document.createElement("style");
+    s.id = "safe-space-popup-style";
+    s.textContent = `
+      .safe-space-popup .mapboxgl-popup-content {
+        background: #0f172a !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.6) !important;
+        padding: 16px !important;
+        color: white !important;
+      }
+      .safe-space-popup .mapboxgl-popup-tip {
+        border-top-color: #0f172a !important;
+        border-bottom-color: #0f172a !important;
+      }
+      .safe-space-popup .mapboxgl-popup-close-button {
+        color: #475569;
+        font-size: 18px;
+        padding: 4px 8px;
+      }
+      .safe-space-popup .mapboxgl-popup-close-button:hover {
+        color: #f1f5f9;
+        background: transparent;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function buildSafeSpaceGeoJSON(
+    spaces: Array<{ id: string; name: string; category: string; lat: number; lng: number; tags: string[]; address?: string }>
+  ): GeoJSON.FeatureCollection {
+    return {
+      type: "FeatureCollection",
+      features: spaces.map((sp) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [sp.lng, sp.lat] },
+        properties: {
+          id: sp.id,
+          name: sp.name,
+          category: sp.category,
+          tags: JSON.stringify(sp.tags ?? []),
+          address: sp.address ?? "",
+          lat: sp.lat,
+          lng: sp.lng,
+        },
+      })),
+    };
+  }
+
+  function renderSafeSpacesWebGL(
+    spaces: Array<{ id: string; name: string; category: string; lat: number; lng: number; tags: string[]; address?: string }>
+  ) {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    const geojson = buildSafeSpaceGeoJSON(spaces);
+
+    // If source already exists, just update data
+    const existing = map.getSource("safe-spaces-source") as mapboxgl.GeoJSONSource | undefined;
+    if (existing) {
+      existing.setData(geojson);
+      return;
+    }
+
+    // First time: add source + glow + core layers
+    map.addSource("safe-spaces-source", { type: "geojson", data: geojson });
+
+    // Glow layer (soft blurred circle behind core)
+    map.addLayer({
+      id: "safe-spaces-glow",
+      type: "circle",
+      source: "safe-spaces-source",
+      paint: {
+        "circle-radius": 22,
+        "circle-color": [
+          "match", ["get", "category"],
+          "Parks", "#10b981",
+          "Libraries", "#3b82f6",
+          "Quiet Cafés", "#f59e0b",
+          "Meditation Rooms", "#8b5cf6",
+          "Campus Spaces", "#f97316",
+          "#8b5cf6",
+        ],
+        "circle-blur": 0.8,
+        "circle-opacity": 0.5,
+      },
+    });
+
+    // Core layer (solid dot on top)
+    map.addLayer({
+      id: "safe-spaces-core",
+      type: "circle",
+      source: "safe-spaces-source",
+      paint: {
+        "circle-radius": 6,
+        "circle-color": [
+          "match", ["get", "category"],
+          "Parks", "#34d399",
+          "Libraries", "#60a5fa",
+          "Quiet Cafés", "#fbbf24",
+          "Meditation Rooms", "#a78bfa",
+          "Campus Spaces", "#fb923c",
+          "#a78bfa",
+        ],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+
+    // Click → premium dark popup
+    map.on("click", "safe-spaces-core", (e) => {
+      const f = e.features?.[0];
+      if (!f || f.geometry.type !== "Point") return;
+      const coords = f.geometry.coordinates as [number, number];
+      const { name, category, address, tags: rawTags, lat, lng } = f.properties as {
+        name: string; category: string; address: string;
+        tags: string; lat: number; lng: number;
+      };
+
+      let parsedTags: string[] = [];
+      try { parsedTags = JSON.parse(rawTags); } catch { parsedTags = []; }
+
+      new mapboxgl.Popup({
+        className: "safe-space-popup",
+        offset: 22,
+        maxWidth: "300px",
+        closeButton: true,
+        closeOnClick: true,
+      })
+        .setLngLat(coords)
+        .setHTML(`
+          <div style="font-family:system-ui,sans-serif;">
+            <div style="margin-bottom:12px;">
+              <h3 style="color:#ffffff;font-weight:700;font-size:15px;margin:0;letter-spacing:-0.3px;line-height:1.3;">${name}</h3>
+              <div style="display:inline-block;margin-top:6px;padding:2px 10px;background:rgba(52,211,153,0.15);color:#34d399;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;border-radius:9999px;border:1px solid rgba(52,211,153,0.3);">
+                ${category}
+              </div>
+              ${address ? `<p style="color:#94a3b8;font-size:11px;margin:8px 0 0;line-height:1.5;">${address}</p>` : ""}
+              ${parsedTags.length ? `<div style="margin-top:8px;">${parsedTags.map((t) => `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.35);color:#6ee7b7;font-size:10px;margin:2px;">${t}</span>`).join("")}</div>` : ""}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #1e293b;">
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:flex;align-items:center;justify-content:center;width:100%;background:#2563eb;color:#ffffff;font-size:11px;font-weight:600;padding:9px 16px;border-radius:8px;text-decoration:none;box-sizing:border-box;"
+                 onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                Directions via Google Maps
+              </a>
+              <a href="http://maps.apple.com/?daddr=${lat},${lng}"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:flex;align-items:center;justify-content:center;width:100%;background:#334155;color:#ffffff;font-size:11px;font-weight:600;padding:9px 16px;border-radius:8px;text-decoration:none;box-sizing:border-box;"
+                 onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#334155'">
+                Directions via Apple Maps
+              </a>
+            </div>
+          </div>`)
+        .addTo(mapRef.current!);
+    });
+
+    // Cursor UX
+    map.on("mouseenter", "safe-spaces-core", () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "safe-spaces-core", () => { map.getCanvas().style.cursor = ""; });
+  }
+
+  function fetchAndRenderSafeSpaces() {
+    supabase
+      .from("safe_spaces")
+      .select("*")
+      .then(({ data }) => {
+        if (data) renderSafeSpacesWebGL(data);
+      });
+  }
+
+  // Store refetch fn accessible to the modal
+  safeSpacesRefetchRef.current = fetchAndRenderSafeSpaces;
+
+  useEffect(() => {
+    if (!readyRef.current) {
+      const id = setInterval(() => {
+        if (readyRef.current) {
+          clearInterval(id);
+          fetchAndRenderSafeSpaces();
+        }
+      }, 300);
+      return () => clearInterval(id);
+    }
+    fetchAndRenderSafeSpaces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <div ref={containerRef} className="h-full w-full" />
       <MoodHeatmap map={mapInstance} checkins={checkins} selectedCity={city.name} />
       <ResourceMarkers map={mapInstance} resources={getResourcesByCity(city.name)} />
+
+      {/* Safe Space Modal — shown on right-click */}
+      {draftSafeSpace && (
+        <AddSafeSpaceModal
+          lat={draftSafeSpace.lat}
+          lng={draftSafeSpace.lng}
+          onClose={() => setDraftSafeSpace(null)}
+          onAdded={() => safeSpacesRefetchRef.current()}
+        />
+      )}
 
       {/* Cinematic Spin Toggle */}
       <button
@@ -491,6 +706,36 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
         }}
       >
         {isSpinning ? "⏸ Stop" : "🔄 Cinematic"}
+      </button>
+
+      {/* Seed Safe Spaces Button */}
+      <button
+        onClick={async () => {
+          setIsSeedingSpaces(true);
+          await seedRealSafeSpaces();
+          fetchAndRenderSafeSpaces();
+          setIsSeedingSpaces(false);
+        }}
+        disabled={isSeedingSpaces}
+        style={{
+          position: "absolute",
+          bottom: 170,
+          right: 16,
+          zIndex: 10,
+          padding: "8px 14px",
+          borderRadius: 9999,
+          border: "1px solid rgba(52,211,153,0.4)",
+          background: "rgba(15,23,42,0.85)",
+          color: isSeedingSpaces ? "#6ee7b7" : "#34d399",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: isSeedingSpaces ? "not-allowed" : "pointer",
+          backdropFilter: "blur(12px)",
+          transition: "all 0.2s ease",
+          opacity: isSeedingSpaces ? 0.6 : 1,
+        }}
+      >
+        {isSeedingSpaces ? "Seeding..." : "🌿 Seed Safe Spaces"}
       </button>
     </>
   );
