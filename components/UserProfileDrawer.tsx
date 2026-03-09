@@ -103,13 +103,13 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
                     hobbies: profile.hobbies,
                     favorite_movies: profile.favorite_movies,
                     favorite_music: profile.favorite_music,
-                    extra_info: profile.extra_info,
+                    other_details: profile.other_details,
                     avatar_url: profile.avatar_url,
                 })
                 .eq("id", user.id);
             if (error) throw error;
-        } catch (err) {
-            console.error("Error saving profile", err);
+        } catch (err: any) {
+            console.error("Error saving profile:", err?.message || JSON.stringify(err) || err);
         } finally {
             setIsSaving(false);
         }
@@ -266,8 +266,8 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
                                         <span>🎯</span> My Goals & Triggers
                                     </label>
                                     <textarea
-                                        value={profile.extra_info || ""}
-                                        onChange={(e) => setProfile({ ...profile, extra_info: e.target.value })}
+                                        value={profile.other_details || ""}
+                                        onChange={(e) => setProfile({ ...profile, other_details: e.target.value })}
                                         className="w-full bg-transparent outline-none resize-none h-28 text-sm text-slate-200 placeholder:text-slate-500"
                                         placeholder="What helps you feel safe & focused?"
                                     />
