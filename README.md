@@ -63,27 +63,108 @@ Then AI insights:
 4) Anonymous Community Checkins
 
 People can post anonymous emotional check-ins on the map.
+Example bubble on map:
+
+📍 Drexel Library
+"I'm overwhelmed with finals."
+
+Others can react:
+	•	❤️ support
+	•	🙏 same
+	•	💬 advice
+
+Think:
+
+Reddit + Google Maps for emotions
 
 
-5) AI Therapist
+5) AI Therapist + AI Copilot Based on Location 🤖
 
-6) AI mood Prediction(Individual/Community)
+Combine map + AI therapist.
 
-7) Daily AI Reflection(With Image)
+Example:
 
-8) Suggest Breathing and mediation tools
+User opens map near campus.
 
-9) Mental Health Score(Sentiment Anaylsis)
+AI says:
 
-10) Crisis Detection, suggest future activities
+“Many people near you reported stress today. Want a 2-minute breathing exercise?”
 
-11) Emotion time Machine(move a time slider on the map)
+Or:
 
-12) Friends Tab
+“There is a quiet park 4 minutes away.”
 
-13) Stripe(monthly subscription)
+This is context-aware AI.
 
-14) Login Page OAuth(Google, Facebook)
+7) AI mood Prediction(Individual/Community)
+
+8) Daily AI Reflection(With Image)
+After check-in:
+
+AI generates reflection.
+
+Example:
+
+User logs mood: 😔
+
+AI response:
+
+“You’ve logged sadness three times this week. Would you like to talk about what’s causing it?”
+
+This creates emotional engagement.
+
+10) Suggest Breathing and meditation tools
+Built-in tools.
+
+Example:
+
+2-minute breathing exercise
+4-7-8 breathing
+grounding exercises
+
+Simple but useful.
+
+
+12) Mental Health Score(Sentiment Anaylsis)
+Users get a well-being score.
+
+Based on:
+	•	check-ins
+	•	journaling
+	•	outdoor time
+	•	sleep input
+
+Encourages healthy habits.
+
+14) Crisis Detection, suggest future activities
+If someone writes something dangerous:
+
+AI flags:
+
+"I'm thinking about hurting myself"
+
+Then shows:
+	•	crisis hotline
+	•	campus support
+	•	AI conversation
+
+16) Emotion time Machine(move a time slider on the map)
+Move a time slider on the map.
+
+Example:
+
+Now
+Yesterday
+Last Week
+Exam Week
+
+Watch emotional patterns shift.
+
+18) Friends Tab
+
+19) Stripe(monthly subscription)
+
+20) Login Page OAuth(Google, Facebook)
 
 
 # MentalMap
