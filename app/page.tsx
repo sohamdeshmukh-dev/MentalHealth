@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import CityNavigator from "@/components/CityNavigator";
-import { CheckIn, CITIES } from "@/lib/types";
+import { CheckIn, CITIES, Mood } from "@/lib/types";
+import WeatherOverlay from "@/components/WeatherOverlay";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
   ssr: false,
@@ -18,6 +19,7 @@ export default function Home() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [timeFilter, setTimeFilter] = useState("All");
   const [isCampusMode, setIsCampusMode] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(async () => {
@@ -112,6 +114,7 @@ export default function Home() {
           cityIndex={cityIndex}
           onNewCheckin={handleNewCheckin}
           onHug={handleHug}
+          onMoodChange={setSelectedMood}
           userLat={userLat}
           userLng={userLng}
         />
@@ -119,7 +122,9 @@ export default function Home() {
 
       {/* Map area */}
       <div className="relative flex-1 overflow-hidden rounded-[30px] border border-slate-800 shadow-2xl shadow-black/30">
-        <Map3DView checkins={filteredCheckins} city={city} focusedCampus={isCampusMode ? dominantCampus : undefined} />
+        {/* Weather Overlay — sits over map, under all UI buttons */}
+        <WeatherOverlay mood={selectedMood} />
+        <Map3DView checkins={filteredCheckins} city={city} focusedCampus={isCampusMode ? dominantCampus : undefined} selectedMood={selectedMood} />
 
         {/* Filters Top Right */}
         <div className="pointer-events-auto absolute right-5 top-5 z-10 flex flex-col gap-2 items-end">
@@ -144,8 +149,8 @@ export default function Home() {
             <button
               onClick={() => setIsCampusMode(!isCampusMode)}
               className={`rounded-full px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors border ${isCampusMode
-                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
-                  : "border-slate-700/50 bg-slate-900/80 text-slate-300 hover:bg-slate-800"
+                ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
+                : "border-slate-700/50 bg-slate-900/80 text-slate-300 hover:bg-slate-800"
                 }`}
             >
               🎓 Focus on Campus: {dominantCampus}

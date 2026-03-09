@@ -20,19 +20,21 @@ const EmotionWheelSelector = dynamic(
 interface MoodFormProps {
   cityName: string;
   onSubmit: (entry: CheckIn) => void;
+  onMoodChange?: (mood: Mood | null) => void;
 }
 
-export default function MoodForm({ cityName, onSubmit }: MoodFormProps) {
+export default function MoodForm({ cityName, onSubmit, onMoodChange }: MoodFormProps) {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    onMoodChange?.(selectedMood);
     if (selectedMood === "Overwhelmed" || selectedMood === "Sad") {
       window.dispatchEvent(new CustomEvent("crisis_alert"));
     }
-  }, [selectedMood]);
+  }, [selectedMood, onMoodChange]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

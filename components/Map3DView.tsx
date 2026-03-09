@@ -45,13 +45,16 @@ interface Map3DViewProps {
   checkins: CheckIn[];
   city: CityConfig;
   focusedCampus?: string;
+  selectedMood?: Mood | null;
 }
 
-export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewProps) {
+export default function Map3DView({ checkins, city, focusedCampus, selectedMood }: Map3DViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
   const readyRef = useRef(false);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const spinFrameRef = useRef<number | null>(null);
 
   // Memoised builders
   const skylineData = useCallback(
@@ -82,7 +85,7 @@ export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewPr
       antialias: true,
     });
 
-    map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
 
     map.on("style.load", () => {
       // ── Terrain ──────────────────────────────────────────────
@@ -282,32 +285,40 @@ export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewPr
 
   // ── Fly to city + update mask ────────────────────────────────
   useEffect(() => {
+    setIsSpinning(false);
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
+
+    // Stop any active rotation/animation immediately
+    map.stop();
 
     if (focusedCampus) {
       const campus = CAMPUSES.find((c) => c.name === focusedCampus);
       if (campus) {
-        map.flyTo({
-          center: [campus.lng, campus.lat],
-          zoom: 15,
-          pitch: 70,
-          bearing: 0,
-          duration: 2200,
-          essential: true,
-        });
+        setTimeout(() => {
+          map.flyTo({
+            center: [campus.lng, campus.lat],
+            zoom: 15,
+            pitch: 70,
+            bearing: 0,
+            duration: 2200,
+            essential: true,
+          });
+        }, 50);
         return;
       }
     }
 
-    map.flyTo({
-      center: [city.lng, city.lat],
-      zoom: 12,
-      pitch: 60,
-      bearing: -20,
-      duration: 2200,
-      essential: true,
-    });
+    setTimeout(() => {
+      map.flyTo({
+        center: [city.lng, city.lat],
+        zoom: 12,
+        pitch: 60,
+        bearing: -20,
+        duration: 2200,
+        essential: true,
+      });
+    }, 50);
 
     const maskSrc = map.getSource("city-mask") as mapboxgl.GeoJSONSource | undefined;
     if (maskSrc) maskSrc.setData(buildCityMask(city));
@@ -326,11 +337,161 @@ export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewPr
     if (skySrc) skySrc.setData(skylineData(checkins));
   }, [checkins, pointData, skylineData]);
 
+  // ── 3D Emotional Weather: Native Mapbox Rain/Snow/Fog (ADDITIVE / ISOLATED) ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    // Cast to `any` because setRain/setSnow are newer Mapbox Standard APIs
+    // not yet in the @types/mapbox-gl package
+    const m = map as any;
+
+    // ── Step 1: Always reset previous weather particles ──
+    try { m.setRain(null); } catch { /* rain API not available in this GL version */ }
+    try { m.setSnow(null); } catch { /* snow API not available in this GL version */ }
+
+    // ── Step 2: Apply mood-specific atmospheric profile ──
+    switch (selectedMood) {
+      case "Sad":
+        // Cinematic rainstorm
+        try {
+          m.setRain({
+            density: 0.8,
+            intensity: 0.9,
+            color: "#7a8b99",
+            opacity: 0.8,
+            "droplet-size": [1.5, 30],
+          });
+        } catch { /* graceful fallback */ }
+        map.setFog({
+          color: "#1a2b3c",
+          "high-color": "#000000",
+          "horizon-blend": 0.2,
+          "space-color": "#000811",
+          "star-intensity": 0.0,
+        });
+        break;
+
+      case "Overwhelmed":
+        // Red ash blizzard (hacked snow API)
+        try {
+          m.setSnow({
+            density: 0.9,
+            intensity: 1.0,
+            color: "#ff4d4d",
+            opacity: 0.8,
+            direction: [45, 70],
+            "center-thinning": 0.1,
+          });
+        } catch { /* graceful fallback */ }
+        map.setFog({
+          color: "#330000",
+          "high-color": "#110000",
+          "horizon-blend": 0.1,
+          "space-color": "#0d0000",
+          "star-intensity": 0.0,
+        });
+        break;
+
+      case "Stressed":
+        // Oppressive, suffocating haze — no particles
+        map.setFog({
+          color: "#8b4513",
+          "high-color": "#3e1a05",
+          "horizon-blend": 0.05,
+          "space-color": "#1a0800",
+          "star-intensity": 0.0,
+        });
+        break;
+
+      case "Happy":
+        // Golden hour glow
+        map.setFog({
+          color: "#ffd700",
+          "high-color": "#ff8c00",
+          "space-color": "#ffecd2",
+          "horizon-blend": 0.3,
+          "star-intensity": 0.0,
+        });
+        break;
+
+      case "Calm":
+        // Clear starlit night
+        map.setFog({
+          color: "#001f3f",
+          "high-color": "#000000",
+          "star-intensity": 1.0,
+          "horizon-blend": 0.4,
+          "space-color": "rgba(2, 6, 23, 1)",
+        });
+        break;
+
+      default:
+        // Neutral / null — standard dark fog
+        map.setFog({
+          color: "#242b3b",
+          "high-color": "#0b0f17",
+          "horizon-blend": 0.18,
+          "space-color": "rgba(2, 6, 23, 1)",
+          "star-intensity": 0.0,
+        });
+        break;
+    }
+  }, [selectedMood]);
+
+  // ── Cinematic Auto-Spin (ADDITIVE / ISOLATED) ──
+  useEffect(() => {
+    if (!isSpinning || !mapRef.current) {
+      if (spinFrameRef.current) {
+        cancelAnimationFrame(spinFrameRef.current);
+        spinFrameRef.current = null;
+      }
+      return;
+    }
+
+    function spin() {
+      if (!mapRef.current) return;
+      mapRef.current.rotateTo(mapRef.current.getBearing() + 0.2, { duration: 0 });
+      spinFrameRef.current = requestAnimationFrame(spin);
+    }
+    spinFrameRef.current = requestAnimationFrame(spin);
+
+    return () => {
+      if (spinFrameRef.current) {
+        cancelAnimationFrame(spinFrameRef.current);
+        spinFrameRef.current = null;
+      }
+    };
+  }, [isSpinning]);
+
   return (
     <>
       <div ref={containerRef} className="h-full w-full" />
       <MoodHeatmap map={mapInstance} checkins={checkins} selectedCity={city.name} />
       <ResourceMarkers map={mapInstance} resources={getResourcesByCity(city.name)} />
+
+      {/* Cinematic Spin Toggle */}
+      <button
+        onClick={() => setIsSpinning((s) => !s)}
+        style={{
+          position: "absolute",
+          bottom: 130,
+          right: 16,
+          zIndex: 10,
+          padding: "8px 14px",
+          borderRadius: 9999,
+          border: isSpinning ? "1px solid rgba(129,140,248,0.6)" : "1px solid rgba(100,116,139,0.4)",
+          background: isSpinning ? "rgba(99,102,241,0.25)" : "rgba(15,23,42,0.85)",
+          color: isSpinning ? "#a5b4fc" : "#94a3b8",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          backdropFilter: "blur(12px)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        {isSpinning ? "⏸ Stop" : "🔄 Cinematic"}
+      </button>
     </>
   );
 }

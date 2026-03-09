@@ -1,5 +1,5 @@
 "use client";
-import { CheckIn, MOODS, CITIES } from "@/lib/types";
+import { CheckIn, MOODS, CITIES, Mood } from "@/lib/types";
 import MoodForm from "./MoodForm";
 import HeatmapLegend from "./HeatmapLegend";
 import dynamic from 'next/dynamic';
@@ -12,6 +12,7 @@ interface SidebarProps {
   cityIndex: number;
   onNewCheckin: (entry: CheckIn) => void;
   onHug: (id: string) => void;
+  onMoodChange?: (mood: Mood | null) => void;
   userLat: number | null;
   userLng: number | null;
 }
@@ -21,6 +22,7 @@ export default function Sidebar({
   cityIndex,
   onNewCheckin,
   onHug,
+  onMoodChange,
   userLat,
   userLng,
 }: SidebarProps) {
@@ -46,7 +48,7 @@ export default function Sidebar({
       <HeatmapLegend />
 
       {/* Mood Form */}
-      <MoodForm cityName={city.name} onSubmit={onNewCheckin} />
+      <MoodForm cityName={city.name} onSubmit={onNewCheckin} onMoodChange={onMoodChange} />
 
       {/* Divider */}
       <hr className="border-slate-800" />
