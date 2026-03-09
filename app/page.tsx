@@ -6,6 +6,8 @@ import Sidebar from "@/components/Sidebar";
 import CityNavigator from "@/components/CityNavigator";
 import { CheckIn, CITIES, Mood } from "@/lib/types";
 import WeatherOverlay from "@/components/WeatherOverlay";
+import ProfileButton from "@/components/ProfileButton";
+import UserProfileDrawer from "@/components/UserProfileDrawer";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
   ssr: false,
@@ -20,6 +22,7 @@ export default function Home() {
   const [timeFilter, setTimeFilter] = useState("All");
   const [isCampusMode, setIsCampusMode] = useState(false);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(async () => {
@@ -126,8 +129,11 @@ export default function Home() {
         <WeatherOverlay mood={selectedMood} />
         <Map3DView checkins={filteredCheckins} city={city} focusedCampus={isCampusMode ? dominantCampus : undefined} selectedMood={selectedMood} />
 
-        {/* Filters Top Right */}
-        <div className="pointer-events-auto absolute right-5 top-5 z-10 flex flex-col gap-2 items-end">
+        {/* Filters and Profile Top Right */}
+        <div className="pointer-events-auto absolute right-5 top-5 z-[50] flex flex-col gap-2 items-end">
+          {/* Profile Toggle */}
+          <ProfileButton onClick={() => setIsProfileOpen(true)} />
+
           {/* Time-of-Day Filter */}
           <div className="flex cursor-pointer rounded-full border border-slate-700/50 bg-slate-900/80 p-1 shadow-lg backdrop-blur-md">
             {["All", "Morning", "Afternoon", "Evening", "Night"].map((f) => (
@@ -180,6 +186,8 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      <UserProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   );
 }
