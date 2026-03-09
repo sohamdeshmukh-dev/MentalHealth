@@ -74,7 +74,7 @@ export default function Map3DView({ checkins, city, focusedCampus }: Map3DViewPr
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: "mapbox://styles/soso593/cmmh6jzoe003m01qn8f00gog6",
       center: [city.lng, city.lat],
       zoom: 14,
       pitch: 60,

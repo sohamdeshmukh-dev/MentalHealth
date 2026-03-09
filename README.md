@@ -1,6 +1,6 @@
 # MentalMap
 
-A 3D interactive emotional skyline platform where stress reports rise from the map as vertical extrusions like skyscrapers, and mood data glows as a Snap Map-style heatmap across 10 major US cities.
+A 3D interactive emotional skyline platform where stress reports rise from the map as vertical extrusions like skyscrapers, and mood data glows as a Snap Map-style heatmap across 11 US cities.
 
 ## Features
 
@@ -10,7 +10,7 @@ A 3D interactive emotional skyline platform where stress reports rise from the m
 - **Custom Light Map** -- Mapbox style `mapbox://styles/soso593/cmmh6jzoe003m01qn8f00gog6`.
 - **City Mask** -- Inverted polygon mask fades everything outside the city's urban boundary.
 - **Arrow Navigation** -- Left/right controls on the map + keyboard arrow keys to fly between cities.
-- **10 Supported Cities** -- NYC (default), LA, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, Jacksonville.
+- **11 Supported Cities** -- NYC (default), LA, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, Jacksonville, Charlottesville.
 - **Tilt, Rotate, Zoom** -- 60-degree pitch with terrain exaggeration for exploring the 3D skyline.
 - **Feelings Check-In** -- Select mood + optional anonymous message. New submissions appear as skyline columns and heatmap intensity in real time.
 

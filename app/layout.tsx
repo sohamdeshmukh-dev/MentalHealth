@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MentalMap - 3D Emotional Skyline",
   description:
-    "Interactive 3D mood heatmap with stress skyline visualization across 10 major US cities.",
+    "Interactive 3D mood heatmap with stress skyline visualization across 11 US cities.",
 };
 
 export default function RootLayout({
