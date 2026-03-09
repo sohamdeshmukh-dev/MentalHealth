@@ -2,11 +2,69 @@
 
 -Real-Time Emotional Weather 
 
+Examples:
+	•	Anxiety → storm clouds
+	•	Calm → sunshine
+	•	Sad → rain
+	•	Happy → glowing areas
+
+Instead of just heatmaps, show:
+	•	emotion layers
+	•	animated overlays
+
+Example map layers:
+	•	😰 Anxiety zones
+	•	😔 Sadness clusters
+	•	😌 Calm spaces
+	•	😄 Happiness hotspots
+
+Tech:
+	•	Mapbox layers
+	•	WebGL overlays
+
+
 -Safe Spaces Finder
 
+Show places where people feel mentally safe.
+
+Examples:
+	•	parks
+	•	libraries
+	•	quiet cafés
+	•	meditation rooms
+	•	campus spaces
+
+Users can tag locations with:
+
+"calm"
+"safe"
+"quiet"
+"good for studying"
+"stressful"
+
 -Mood Journey Tracking
+Let users see their emotional patterns over time.
+
+Example dashboard:
+
+Monday: stressed
+Tuesday: anxious
+Wednesday: calm
+Thursday: calm
+Friday: happy
+
+Graph:
+
+Mood Score vs Time
+
+Then AI insights:
+
+“You tend to feel stressed near the library during exam weeks.”
 
 -Anonymous Community Checkins
+
+People can post anonymous emotional check-ins on the map.
+
 
 -AI Therapist
 
@@ -25,7 +83,6 @@
 -Friends Tab
 
 -Stripe(monthly subscription)
-
 
 
 # MentalMap
