@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PROTECTED_ROUTES = ["/", "/journal", "/friends", "/profile"];
+
 export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
@@ -35,8 +37,10 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     const { pathname } = request.nextUrl;
 
-    // Rule 1: Protect Map - No user session and trying to access /
-    if (!user && pathname === "/") {
+    // Rule 1: Protect routes - No user session and trying to access protected page
+    if (!user && PROTECTED_ROUTES.some(route =>
+        route === "/" ? pathname === "/" : pathname.startsWith(route)
+    )) {
         url.pathname = "/login";
         return NextResponse.redirect(url);
     }

@@ -2,12 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import CityNavigator from "@/components/CityNavigator";
-import { CheckIn, CITIES, Mood } from "@/lib/types";
-import WeatherOverlay from "@/components/WeatherOverlay";
-import ProfileButton from "@/components/ProfileButton";
-import UserProfileDrawer from "@/components/UserProfileDrawer";
+import { CheckIn, CITIES } from "@/lib/types";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
   ssr: false,
@@ -16,13 +12,8 @@ const Map3DView = dynamic(() => import("@/components/Map3DView"), {
 export default function Home() {
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [cityIndex, setCityIndex] = useState(0);
-  const [userLat, setUserLat] = useState<number | null>(null);
-  const [userLng, setUserLng] = useState<number | null>(null);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [timeFilter, setTimeFilter] = useState("All");
   const [isCampusMode, setIsCampusMode] = useState(false);
-  const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const city = CITIES[cityIndex];
 
   const fetchCheckins = useCallback(async () => {
@@ -55,24 +46,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  function handleNewCheckin(entry: CheckIn) {
-    setCheckins((prev) => [entry, ...prev]);
-  }
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        setUserLat(position.coords.latitude);
-        setUserLng(position.coords.longitude);
-      });
-    }
-  }, []);
-
-  function handleHug(id: string) {
-    setCheckins((prev) => prev.map((c) => (c.id === id ? { ...c, hugs: (c.hugs || 0) + 1 } : c)));
-    fetch("/api/checkins/hug", { method: "POST", body: JSON.stringify({ id }) }).catch(console.error);
-  }
-
   const filteredCheckins = checkins.filter((c) => {
     if (isCampusMode && !c.campus_name) return false;
     if (timeFilter === "All") return true;
@@ -87,60 +60,22 @@ export default function Home() {
   // Find dominant campus in current city
   const dominantCampus = checkins.find((c) => c.campus_name)?.campus_name;
 
-  const seedMockData = async () => {
-    setIsSeeding(true);
-    const moods = ["Happy", "Calm", "Neutral", "Stressed", "Sad", "Overwhelmed"];
-    try {
-      const promises = Array.from({ length: 50 }).map(() => {
-        const randomMood = moods[Math.floor(Math.random() * moods.length)];
-        return fetch("/api/checkins", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mood: randomMood, city: city.name, message: "Mock seeded data" })
-        });
-      });
-      await Promise.all(promises);
-      await fetchCheckins();
-    } catch (err) {
-      console.error("Error seeding mock data:", err);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   return (
-    <div className="flex h-screen w-screen gap-4 bg-[#050913] p-4">
-      {/* Sidebar widget */}
-      <div className="h-full w-[360px] shrink-0 overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950/85 shadow-2xl shadow-black/40">
-        <Sidebar
+    <div className="h-screen w-full overflow-hidden bg-[#050913] p-2 sm:p-4">
+      <div className="relative h-full w-full overflow-hidden rounded-[26px] border border-slate-800/90 shadow-2xl shadow-black/35 sm:rounded-[32px]">
+        <Map3DView
           checkins={filteredCheckins}
-          cityIndex={cityIndex}
-          onNewCheckin={handleNewCheckin}
-          onHug={handleHug}
-          onMoodChange={setSelectedMood}
-          userLat={userLat}
-          userLng={userLng}
+          city={city}
+          focusedCampus={isCampusMode ? dominantCampus : undefined}
         />
-      </div>
 
-      {/* Map area */}
-      <div className="relative flex-1 overflow-hidden rounded-[30px] border border-slate-800 shadow-2xl shadow-black/30">
-        {/* Weather Overlay — sits over map, under all UI buttons */}
-        <WeatherOverlay mood={selectedMood} />
-        <Map3DView checkins={filteredCheckins} city={city} focusedCampus={isCampusMode ? dominantCampus : undefined} selectedMood={selectedMood} />
-
-        {/* Filters and Profile Top Right */}
-        <div className="pointer-events-auto absolute right-5 top-5 z-[50] flex flex-col gap-2 items-end">
-          {/* Profile Toggle */}
-          <ProfileButton onClick={() => setIsProfileOpen(true)} />
-
-          {/* Time-of-Day Filter */}
+        <div className="pointer-events-auto absolute right-3 top-20 z-[50] flex flex-col items-end gap-2 sm:right-5 sm:top-5">
           <div className="flex cursor-pointer rounded-full border border-slate-700/50 bg-slate-900/80 p-1 shadow-lg backdrop-blur-md">
             {["All", "Morning", "Afternoon", "Evening", "Night"].map((f) => (
               <div
                 key={f}
                 onClick={() => setTimeFilter(f)}
-                className={`rounded-full px-4 py-1.5 text-xs font-semibold tracking-wide transition-colors ${timeFilter === f
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition-colors sm:px-4 sm:text-xs ${timeFilter === f
                   ? "bg-indigo-600 text-white shadow"
                   : "text-slate-400 hover:text-slate-200"
                   }`}
@@ -150,11 +85,10 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Campus Toggle */}
           {dominantCampus && (
             <button
               onClick={() => setIsCampusMode(!isCampusMode)}
-              className={`rounded-full px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors border ${isCampusMode
+              className={`rounded-full border px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors ${isCampusMode
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
                 : "border-slate-700/50 bg-slate-900/80 text-slate-300 hover:bg-slate-800"
                 }`}
@@ -164,30 +98,17 @@ export default function Home() {
           )}
         </div>
 
-        {/* City navigator overlay — centered at top */}
-        <div className="pointer-events-auto absolute left-1/2 top-5 z-10 -translate-x-1/2">
+        <div className="pointer-events-auto absolute left-1/2 top-20 z-10 -translate-x-1/2 sm:top-5">
           <CityNavigator currentIndex={cityIndex} onNavigate={setCityIndex} />
         </div>
 
-        {/* City label bottom-left */}
         <div className="pointer-events-none absolute bottom-6 left-6 flex items-end gap-3">
           <div>
-            <p className="text-2xl font-bold text-slate-100 drop-shadow-md">
-              {city.name}
-            </p>
+            <p className="text-2xl font-bold text-slate-100 drop-shadow-md">{city.name}</p>
             <p className="text-sm text-slate-300/80">{city.state}</p>
           </div>
-          <button
-            onClick={seedMockData}
-            disabled={isSeeding}
-            className="pointer-events-auto rounded-full bg-slate-800/80 px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-slate-300 backdrop-blur-md hover:bg-slate-700/80 disabled:opacity-50 border border-slate-700/50 transition duration-200 ml-2"
-          >
-            {isSeeding ? "Seeding..." : "Seed 50 Points"}
-          </button>
         </div>
       </div>
-
-      <UserProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   );
 }
