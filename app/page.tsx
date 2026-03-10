@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import CityNavigator from "@/components/CityNavigator";
+import LocalClock from "@/components/LocalClock";
 import { CheckIn, CITIES } from "@/lib/types";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
@@ -102,11 +103,8 @@ export default function Home() {
           <CityNavigator currentIndex={cityIndex} onNavigate={setCityIndex} />
         </div>
 
-        <div className="pointer-events-none absolute bottom-6 left-6 flex items-end gap-3">
-          <div>
-            <p className="text-2xl font-bold text-slate-100 drop-shadow-md">{city.name}</p>
-            <p className="text-sm text-slate-300/80">{city.state}</p>
-          </div>
+        <div className="pointer-events-none absolute bottom-6 left-6 z-[45]">
+          <LocalClock selectedCity={city.name} selectedState={city.state} />
         </div>
       </div>
     </div>

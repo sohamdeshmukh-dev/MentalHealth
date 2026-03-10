@@ -58,6 +58,13 @@ html {
     brightness(102%) contrast(95%);
 }
 
+/* Hide Mapbox branding controls on map canvas */
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-attrib-button {
+  display: none !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

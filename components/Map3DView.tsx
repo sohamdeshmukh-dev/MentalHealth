@@ -89,6 +89,7 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
       pitch: 60,
       bearing: -20,
       antialias: true,
+      attributionControl: false,
     });
 
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");

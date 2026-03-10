@@ -12,17 +12,19 @@ const cityTimezones: Record<string, string> = {
     'San Diego': 'America/Los_Angeles',
     'Dallas': 'America/Chicago',
     'San Jose': 'America/Los_Angeles',
-    'Austin': 'America/Chicago'
+    'Austin': 'America/Chicago',
+    'Jacksonville': 'America/New_York',
+    'Charlottesville': 'America/New_York'
 };
 
 interface Props {
     selectedCity: string;
+    selectedState?: string;
 }
 
-export default function LocalClock({ selectedCity }: Props) {
+export default function LocalClock({ selectedCity, selectedState }: Props) {
     const [time, setTime] = useState('');
     const [date, setDate] = useState('');
-    const [city, setCity] = useState('');
 
     useEffect(() => {
         if (!selectedCity) return;
@@ -44,16 +46,18 @@ export default function LocalClock({ selectedCity }: Props) {
     if (!selectedCity || !time) return null;
 
     return (
-        <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl bg-black/60
-                    backdrop-blur-md border border-white/10 text-white shadow-xl">
-            <span className="text-[10px] uppercase tracking-widest text-white/40 font-semibold">
-                📍 Your Location
+        <div
+            className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-white shadow-xl backdrop-blur-md"
+        >
+            <span className="text-[11px] font-semibold tracking-wide text-white/55">
+                {date}
             </span>
-            <span className="text-base font-semibold text-white/80">{selectedCity}</span>
+            <span className="text-sm font-semibold text-white/80">
+                📍 {selectedCity}{selectedState ? `, ${selectedState}` : ""}
+            </span>
             <span className="text-4xl font-bold tabular-nums tracking-tight leading-none">
                 {time}
             </span>
-            <span className="text-xs text-white/50 mt-0.5">{date}</span>
         </div>
     );
 }
