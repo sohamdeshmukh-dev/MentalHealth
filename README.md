@@ -168,9 +168,13 @@ Watch emotional patterns shift.
 
 21)Weather forecast(slider)
 
-22) UI section roller at the top of the screen to switch tabs from mood section and friends
+22) UI section roller at the top of the screen to switch tabs from the mood section and friends
 
 23) Add an integration for college students to see their colleges on the map and their specific data sets for the college
+
+24) Add some financial features for Capital One ( Ask AI for ideas)
+
+25) IOS chat intergration into the friends tab 
 
 
 # MentalMap
