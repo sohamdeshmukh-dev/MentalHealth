@@ -12,31 +12,37 @@ interface Contact {
 interface ProfileSafetyPanelProps {
     profile: any;
     contacts: Contact[];
-    journalCount: number;
-    checkinCount: number;
+    shieldActive: boolean;
     onUpdateProfile: (updates: Record<string, any>) => void;
-    onAddContact: (contact: { name: string; phone: string; relationship: string }) => void;
+    onToggleShield: () => void;
+    onTestShield: () => void;
+    onRecoveryUnlock: () => void;
+    onAddContact: (contact?: { name: string; phone: string; relationship: string }) => void;
     onDeleteContact: (id: string) => void;
     onExportData: () => void;
     onDeleteAllJournal: () => void;
+    journalEntries: any[];
 }
 
 export default function ProfileSafetyPanel({
     profile,
     contacts,
-    journalCount,
-    checkinCount,
+    shieldActive,
     onUpdateProfile,
+    onToggleShield,
+    onTestShield,
+    onRecoveryUnlock,
     onAddContact,
     onDeleteContact,
     onExportData,
     onDeleteAllJournal,
+    journalEntries,
 }: ProfileSafetyPanelProps) {
     const [showAddContact, setShowAddContact] = useState(false);
     const [contactName, setContactName] = useState("");
     const [contactPhone, setContactPhone] = useState("");
     const [contactRelation, setContactRelation] = useState("");
-    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [showSpendingInsight, setShowSpendingInsight] = useState(false);
 
     function handleAddContact(e: React.FormEvent) {
         e.preventDefault();
@@ -46,6 +52,20 @@ export default function ProfileSafetyPanel({
         setContactPhone("");
         setContactRelation("");
         setShowAddContact(false);
+    }
+
+    function getMoodCorrelationData() {
+        return (journalEntries || []).map((entry: any) => {
+            const lowMoods = ['Sad', 'Stressed', 'Overwhelmed', 'Angry'];
+            const isBlocked = lowMoods.some(m => entry.mood?.toLowerCase().includes(m.toLowerCase()));
+            const spend = isBlocked ? 0 : (Math.random() * 380 + 1).toFixed(2);
+            return {
+                date: new Date(entry.created_at).toLocaleDateString(),
+                mood: entry.mood,
+                spend,
+                isBlocked
+            };
+        });
     }
 
     return (
@@ -85,9 +105,9 @@ export default function ProfileSafetyPanel({
                                         </a>
                                         <button
                                             onClick={() => onDeleteContact(c.id)}
-                                            className="opacity-0 group-hover:opacity-100 rounded-lg bg-red-500/10 px-2 py-1.5 text-[11px] text-red-400 hover:bg-red-500/20 transition-all"
+                                            className="opacity-0 group-hover:opacity-100 rounded-lg bg-red-500/10 px-2 py-1.5 text-[11px] text-red-400 hover:bg-red-500/20 transition-all font-bold"
                                         >
-                                            ✕
+                                            🗑️
                                         </button>
                                     </div>
                                 </div>
@@ -205,18 +225,129 @@ export default function ProfileSafetyPanel({
                         </button>
                     </div>
                 </div>
+            </div>
 
-                {/* AI Support Link */}
-                <div className="mt-5">
-                    <button className="w-full rounded-2xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/20 p-4 text-center hover:from-violet-600/30 hover:to-indigo-600/30 transition-all group">
-                        <div className="text-xl mb-1">🤖</div>
-                        <div className="text-sm font-semibold text-violet-300 group-hover:text-violet-200">
-                            AI Wellness Assistant
+            {/* Capital One Financial Wellness Section */}
+            <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-br from-[#004879]/20 to-[#d03027]/10 p-6 backdrop-blur-sm shadow-[0_0_30px_rgba(0,72,121,0.15)]">
+                <h2 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+                    <span>💳</span> Capital One: Financial Resilience
+                </h2>
+
+                <div className="space-y-4">
+                    {/* Link Status */}
+                    <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                        <div className="text-sm font-medium text-slate-200">Account Status</div>
+                        {profile.capital_one_linked ? (
+                            <div className="flex gap-2">
+                                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                    Linked ✅
+                                </div>
+                                <button
+                                    onClick={() => onUpdateProfile({ capital_one_linked: false })}
+                                    className="text-[10px] font-bold text-slate-500 hover:text-red-400 uppercase tracking-wider transition-colors"
+                                >
+                                    Unlink
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => onUpdateProfile({ capital_one_linked: true })}
+                                className="rounded-xl bg-[#004879] hover:bg-[#00365b] px-4 py-2 text-xs font-bold text-white transition-all shadow-lg shadow-blue-900/20"
+                            >
+                                Link Capital One Account
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Impulse Shield */}
+                    <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                        <div className="flex-1 pr-4">
+                            <div className="flex items-center gap-2">
+                                <div className="text-sm font-medium text-white">🛡️ Impulse Shield</div>
+                                <button
+                                    onClick={onTestShield}
+                                    className="text-[9px] px-2 py-0.5 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all font-bold"
+                                >
+                                    TEST
+                                </button>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                                Automatically notify a contact or limit non-essential spending when your mood is logged as critical.
+                            </div>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                            Get personalized insights based on your journal
+                        <button
+                            onClick={onToggleShield}
+                            className={`relative h-7 w-12 rounded-full transition-colors shrink-0 ${shieldActive ? "bg-[#d03027]" : "bg-slate-700"
+                                }`}
+                        >
+                            <div
+                                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${shieldActive ? "translate-x-5" : "translate-x-0.5"
+                                    }`}
+                            />
+                        </button>
+                    </div>
+
+                    {shieldActive && (
+                        <button
+                            onClick={onRecoveryUnlock}
+                            className="w-full mt-2 rounded-xl border border-teal-500/30 bg-teal-500/10 py-2.5 text-xs font-bold text-teal-400 hover:bg-teal-500/20 transition-all flex items-center justify-center gap-2 animate-in slide-in-from-top-2 duration-300"
+                        >
+                            🌱 I'm feeling better (Unlock Account)
+                        </button>
+                    )}
+
+                    {/* Spending Insight */}
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={() => setShowSpendingInsight(!showSpendingInsight)}
+                            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-3 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all flex items-center justify-center gap-2"
+                        >
+                            <span>📊</span> View Mood-Spending Correlation
+                        </button>
+                        {showSpendingInsight && (
+                            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 animate-in slide-in-from-top-2 duration-200">
+                                <div className="text-xs font-bold text-indigo-400 mb-4 uppercase tracking-tight text-center">Mood-Spending Correlation History</div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {getMoodCorrelationData().length > 0 ? getMoodCorrelationData().map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs py-2 border-b border-white/[0.05] last:border-0">
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-500 text-[10px]">{item.date}</span>
+                                                <span className="text-slate-300 font-medium">{item.mood}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {item.isBlocked ? (
+                                                    <>
+                                                        <span className="text-red-400 font-mono">$0.00</span>
+                                                        <span title="Spending Blocked by Impulse Shield">🔒</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-emerald-400 font-mono">${item.spend}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="text-[11px] text-slate-500 text-center py-4 italic">No journal entries found for correlation.</div>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-4 text-center leading-relaxed border-t border-white/[0.05] pt-3">
+                                    Integration active. We correlate mood patterns with spending to build financial resilience.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Wellness Rewards */}
+                    <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-full border border-amber-500/20">
+                            <span className="text-xs font-bold text-amber-400">Wellness Points: {profile.wellness_points || 0}</span>
                         </div>
-                    </button>
+                        <button
+                            className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors uppercase tracking-wider"
+                            onClick={() => alert("Points can be redeemed for Capital One statement credits starting next month!")}
+                        >
+                            Redeem Now →
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -237,8 +368,8 @@ export default function ProfileSafetyPanel({
                                 key={option}
                                 onClick={() => onUpdateProfile({ mood_visibility: option })}
                                 className={`rounded-xl px-4 py-2 text-xs font-semibold capitalize transition-all ${profile.mood_visibility === option
-                                        ? "bg-teal-500/20 text-teal-400 border border-teal-500/30"
-                                        : "bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:text-white"
+                                    ? "bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                                    : "bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:text-white"
                                     }`}
                             >
                                 {option}
@@ -256,34 +387,16 @@ export default function ProfileSafetyPanel({
                         <span>📦</span> Export My Data
                     </button>
 
-                    {confirmDelete ? (
-                        <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] p-4 text-center space-y-2">
-                            <p className="text-sm text-red-400 font-medium">
-                                This will permanently delete all journal entries. Are you sure?
-                            </p>
-                            <div className="flex gap-2 justify-center">
-                                <button
-                                    onClick={() => { onDeleteAllJournal(); setConfirmDelete(false); }}
-                                    className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-500 transition-colors"
-                                >
-                                    Yes, Delete All
-                                </button>
-                                <button
-                                    onClick={() => setConfirmDelete(false)}
-                                    className="rounded-lg bg-white/[0.05] px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setConfirmDelete(true)}
-                            className="w-full rounded-xl border border-red-500/20 bg-red-500/[0.05] py-3 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
-                        >
-                            <span>🗑️</span> Delete All Journal Entries
-                        </button>
-                    )}
+                    <button
+                        onClick={() => {
+                            if (window.confirm("This will permanently delete all journal entries. Are you sure?")) {
+                                onDeleteAllJournal();
+                            }
+                        }}
+                        className="w-full rounded-xl border border-red-500/20 bg-red-500/[0.05] py-3 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
+                    >
+                        <span>🗑️</span> Delete All Journal Entries
+                    </button>
                 </div>
             </div>
         </div>

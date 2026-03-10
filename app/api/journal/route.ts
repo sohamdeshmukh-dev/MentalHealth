@@ -35,7 +35,7 @@ export async function GET() {
     }
 
     const { data, error } = await supabase
-        .from("mood_journal")
+        .from("journal_entries")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-        .from("mood_journal")
+        .from("journal_entries")
         .insert({
             user_id: user.id,
             mood,
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-        .from("mood_journal")
+        .from("journal_entries")
         .delete()
         .eq("id", id)
         .eq("user_id", user.id);

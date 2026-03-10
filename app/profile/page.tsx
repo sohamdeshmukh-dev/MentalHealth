@@ -21,72 +21,90 @@ export default function ProfilePage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const [data, setData] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
+    const [contacts, setContacts] = useState<any[]>([]);
+    const [journalEntries, setJournalEntries] = useState<any[]>([]);
+    const [counts, setCounts] = useState({ checkins: 0, journals: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [showAvatars, setShowAvatars] = useState(false);
-    const [username, setUsername] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [savingUsername, setSavingUsername] = useState(false);
+    const [shieldActive, setShieldActive] = useState(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    const fetchProfile = useCallback(async () => {
+    const fetchProfileData = useCallback(async () => {
         try {
-            const res = await fetch("/api/profile");
-            if (res.ok) {
-                const json = await res.json();
-                setData(json);
-                setUsername(json.profile?.username || "");
-                setDisplayName(json.profile?.display_name || "");
-            }
-        } catch (err) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Fetch profile
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            // Fetch contacts
+            const { data: contactsData } = await supabase
+                .from('emergency_contacts')
+                .select('*')
+                .eq('user_id', user.id);
+
+            // Fetch counts
+            const [checkinRes, journalRes] = await Promise.all([
+                supabase.from('checkins').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+                supabase.from('mood_journal').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+            ]);
+
+            // Fetch journal entries
+            const { data: journalData } = await supabase
+                .from('journal_entries')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            setProfile(profileData);
+            setContacts(contactsData || []);
+            setJournalEntries(journalData || []);
+            setCounts({
+                checkins: checkinRes.count || 0,
+                journals: journalRes.count || 0
+            });
+            setDisplayName(profileData?.display_name || "");
+            setShieldActive(profileData?.impulse_shield_active || false);
+        } catch (err: any) {
             console.error("Error loading profile:", err);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [supabase]);
 
     useEffect(() => {
-        fetchProfile();
-    }, [fetchProfile]);
+        fetchProfileData();
+    }, [fetchProfileData]);
 
     async function handleUpdateProfile(updates: Record<string, any>) {
         try {
-            await fetch("/api/profile", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updates),
-            });
-            setData((prev: any) => ({
-                ...prev,
-                profile: { ...prev.profile, ...updates },
-            }));
-        } catch (err) {
-            console.error("Error updating profile:", err);
-        }
-    }
-
-    async function handleSaveUsername() {
-        setSavingUsername(true);
-        try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("No user found");
+            if (!user) return;
 
             const { error } = await supabase
                 .from('profiles')
-                .update({ display_name: displayName })
+                .update(updates)
                 .eq('id', user.id);
 
             if (error) throw error;
 
-            // Refresh local state
-            setData((prev: any) => ({
-                ...prev,
-                profile: { ...prev.profile, display_name: displayName }
-            }));
+            setProfile((prev: any) => ({ ...prev, ...updates }));
         } catch (err: any) {
-            console.error("Error saving name:", err?.message || err?.details || JSON.stringify(err) || err);
-        } finally {
-            setSavingUsername(false);
+            console.error("Error updating profile:", err);
         }
+    }
+
+    async function handleSaveDisplayName() {
+        setSavingUsername(true);
+        await handleUpdateProfile({ display_name: displayName });
+        setSavingUsername(false);
     }
 
     async function handleAvatarSelect(url: string) {
@@ -94,75 +112,139 @@ export default function ProfilePage() {
         await handleUpdateProfile({ avatar_url: url });
     }
 
-    async function handleAddContact(contact: { name: string; phone: string; relationship: string }) {
+    async function handleAddContact(contact?: { name: string; phone: string; relationship: string }) {
         try {
-            const res = await fetch("/api/profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "add_contact", ...contact }),
-            });
-            if (res.ok) {
-                const newContact = await res.json();
-                setData((prev: any) => ({
-                    ...prev,
-                    contacts: [newContact, ...(prev.contacts || [])],
-                }));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            let name = contact?.name;
+            let phone = contact?.phone;
+            let relationship = contact?.relationship || "";
+
+            if (!name || !phone) {
+                name = window.prompt("Enter contact name:") || "";
+                if (!name) return;
+                phone = window.prompt("Enter contact phone number:") || "";
+                if (!phone) return;
+                relationship = window.prompt("Relationship (optional):") || "";
             }
-        } catch (err) {
+
+            const { data: newContact, error } = await supabase
+                .from('emergency_contacts')
+                .insert({ user_id: user.id, name, phone, relationship })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setContacts((prev) => [newContact, ...prev]);
+        } catch (err: any) {
             console.error("Error adding contact:", err);
+            alert("Failed to save contact.");
         }
     }
 
     async function handleDeleteContact(id: string) {
         try {
-            await fetch("/api/profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "delete_contact", id }),
-            });
-            setData((prev: any) => ({
-                ...prev,
-                contacts: prev.contacts.filter((c: any) => c.id !== id),
-            }));
-        } catch (err) {
+            const { error } = await supabase
+                .from("emergency_contacts")
+                .delete()
+                .eq("id", id);
+
+            if (error) throw error;
+
+            setContacts((prev) => prev.filter((c: any) => c.id !== id));
+        } catch (err: any) {
             console.error("Error deleting contact:", err);
         }
     }
 
     async function handleExportData() {
         try {
-            const res = await fetch("/api/profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "export" }),
-            });
-            if (res.ok) {
-                const exportData = await res.json();
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `mentalmap-export-${new Date().toISOString().split("T")[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
+            const exportObj = {
+                profile,
+                contacts,
+                journal_entries: journalEntries,
+                exportedAt: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `mentalmap-profile-export.json`;
+            a.click();
+            URL.revokeObjectURL(url);
         } catch (err) {
-            console.error("Error exporting data:", err);
+            console.error("Export error:", err);
         }
     }
 
     async function handleDeleteAllJournal() {
         try {
-            await fetch("/api/profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "delete_all_journal" }),
-            });
-            setData((prev: any) => ({ ...prev, journalCount: 0 }));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            if (!window.confirm("Are you sure? This cannot be undone.")) return;
+
+            const { error } = await supabase
+                .from('journal_entries')
+                .delete()
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            setJournalEntries([]);
+            setCounts((prev) => ({ ...prev, journals: 0 }));
+            setToastMessage("🗑️ All journal entries deleted.");
+            setTimeout(() => setToastMessage(null), 3000);
         } catch (err) {
-            console.error("Error deleting journal:", err);
+            console.error("Delete error:", err);
         }
     }
+
+    async function handleToggleShield() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const newValue = !shieldActive;
+            setShieldActive(newValue);
+
+            await supabase
+                .from('profiles')
+                .update({ impulse_shield_active: newValue })
+                .eq('id', user.id);
+
+            setProfile((prev: any) => ({ ...prev, impulse_shield_active: newValue }));
+        } catch (err) {
+            console.error("Shield toggle error:", err);
+        }
+    }
+
+    const handleTestShield = () => {
+        const contactNames = contacts && contacts.length > 0
+            ? contacts.map((c: any) => c.name).join(', ')
+            : "your emergency contacts";
+
+        setToastMessage(`🚨 SHIELD ACTIVE: Simulated Capital One spending lock engaged. Emergency alert sent to: ${contactNames}!`);
+        setTimeout(() => setToastMessage(null), 4000);
+    };
+
+    const handleRecoveryUnlock = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            setShieldActive(false);
+            await supabase.from('profiles').update({ impulse_shield_active: false }).eq('id', user.id);
+            setProfile((prev: any) => ({ ...prev, impulse_shield_active: false }));
+            setToastMessage("💚 Account Unlocked. We are so glad you are feeling better!");
+            setTimeout(() => setToastMessage(null), 4000);
+        } catch (err) {
+            console.error("Unlock error:", err);
+        }
+    };
 
     async function handleLogout() {
         await supabase.auth.signOut();
@@ -177,12 +259,9 @@ export default function ProfilePage() {
         );
     }
 
-    const profile = data?.profile || {};
-
     return (
         <div className="min-h-screen bg-[#050913] page-enter">
             <div className="mx-auto max-w-3xl px-4 pb-8 pt-24 sm:px-6">
-                {/* Header */}
                 <div className="mb-8 text-center">
                     <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                         <span className="bg-gradient-to-r from-teal-400 to-violet-400 bg-clip-text text-transparent">
@@ -194,16 +273,14 @@ export default function ProfilePage() {
                     </p>
                 </div>
 
-                {/* User Profile Card */}
                 <div className="mb-6 rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
                     <div className="flex flex-col sm:flex-row items-center gap-6">
-                        {/* Avatar */}
                         <div className="relative">
                             <div
                                 onClick={() => setShowAvatars(!showAvatars)}
                                 className="h-24 w-24 rounded-full bg-slate-800 border-2 border-teal-500/40 overflow-hidden flex items-center justify-center cursor-pointer hover:border-teal-400 transition-colors shadow-[0_0_25px_rgba(20,184,166,0.2)]"
                             >
-                                {profile.avatar_url ? (
+                                {profile?.avatar_url ? (
                                     <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
                                     <span className="text-4xl text-slate-500">👤</span>
@@ -217,18 +294,17 @@ export default function ProfilePage() {
                             </button>
                         </div>
 
-                        {/* Info */}
                         <div className="flex-1 text-center sm:text-left">
                             <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
                                 <input
                                     type="text"
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
-                                    placeholder="Set username..."
+                                    placeholder="Set display name..."
                                     className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-teal-500/40 focus:outline-none w-48 text-center sm:text-left"
                                 />
                                 <button
-                                    onClick={handleSaveUsername}
+                                    onClick={handleSaveDisplayName}
                                     disabled={savingUsername}
                                     className="rounded-xl bg-teal-600/20 border border-teal-500/30 px-3 py-2 text-xs font-semibold text-teal-400 hover:bg-teal-600/30 transition-all disabled:opacity-50"
                                 >
@@ -236,32 +312,30 @@ export default function ProfilePage() {
                                 </button>
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono tracking-wider mb-3">
-                                Code: {profile.unique_code || "—"}
+                                Code: {profile?.unique_code || "HACK-2024"}
                             </div>
-                            <div className="text-[12px] text-slate-500">{data?.email}</div>
+                            <div className="text-[12px] text-slate-500">{profile?.email || "user@example.com"}</div>
                         </div>
 
-                        {/* Stats */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-teal-400">{data?.checkinCount || 0}</div>
+                                <div className="text-xl font-bold text-teal-400">{counts.checkins}</div>
                                 <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Check-ins</div>
                             </div>
                             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-indigo-400">{data?.journalCount || 0}</div>
+                                <div className="text-xl font-bold text-indigo-400">{counts.journals}</div>
                                 <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Journal</div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Avatar picker */}
                     {showAvatars && (
                         <div className="mt-4 grid grid-cols-4 sm:grid-cols-8 gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 animate-in zoom-in-95 duration-200">
                             {AVATARS.map((url, i) => (
                                 <div
                                     key={i}
                                     onClick={() => handleAvatarSelect(url)}
-                                    className={`aspect-square rounded-xl overflow-hidden cursor-pointer hover:ring-2 ring-teal-400 transition-all ${profile.avatar_url === url ? "ring-2 ring-teal-500" : ""
+                                    className={`aspect-square rounded-xl overflow-hidden cursor-pointer hover:ring-2 ring-teal-400 transition-all ${profile?.avatar_url === url ? "ring-2 ring-teal-500" : ""
                                         }`}
                                 >
                                     <img src={url} alt={`Avatar ${i + 1}`} className="w-full h-full object-cover bg-slate-800" />
@@ -271,20 +345,21 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                {/* Safety & Privacy */}
                 <ProfileSafetyPanel
-                    profile={profile}
-                    contacts={data?.contacts || []}
-                    journalCount={data?.journalCount || 0}
-                    checkinCount={data?.checkinCount || 0}
+                    profile={profile || {}}
+                    contacts={contacts}
+                    journalEntries={journalEntries}
+                    shieldActive={shieldActive}
                     onUpdateProfile={handleUpdateProfile}
+                    onToggleShield={handleToggleShield}
+                    onTestShield={handleTestShield}
+                    onRecoveryUnlock={handleRecoveryUnlock}
                     onAddContact={handleAddContact}
                     onDeleteContact={handleDeleteContact}
                     onExportData={handleExportData}
                     onDeleteAllJournal={handleDeleteAllJournal}
                 />
 
-                {/* Logout */}
                 <div className="mt-6">
                     <button
                         onClick={handleLogout}
@@ -294,6 +369,16 @@ export default function ProfilePage() {
                     </button>
                 </div>
             </div>
+
+            {toastMessage && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[90vw] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="rounded-2xl border border-white/10 bg-[#0a0f1d]/90 p-4 shadow-2xl backdrop-blur-md text-center">
+                        <div className="text-sm font-medium text-white leading-relaxed">
+                            {toastMessage}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

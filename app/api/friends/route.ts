@@ -71,7 +71,7 @@ export async function GET() {
 
     // Get journal entry counts for leaderboard
     const { data: journalCounts } = await supabase
-        .from("mood_journal")
+        .from("journal_entries")
         .select("user_id")
         .in("user_id", [...friendIds, user.id]);
 

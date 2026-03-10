@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Leaderboard from "@/components/Leaderboard";
 import { createBrowserClient } from "@supabase/ssr";
+import FloatingChat from "@/components/FloatingChat";
 
 type Tab = "friends" | "leaderboard";
 
@@ -435,6 +436,7 @@ export default function FriendsPage() {
                     <Leaderboard entries={leaderboardEntries} />
                 )}
             </div>
+            <FloatingChat />
         </div>
     );
 }

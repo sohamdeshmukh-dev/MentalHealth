@@ -43,7 +43,7 @@ export async function GET() {
 
     // Get journal entry count
     const { count: journalCount } = await supabase
-        .from("mood_journal")
+        .from("journal_entries")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     // Export data
     if (body.action === "export") {
         const { data: journal } = await supabase
-            .from("mood_journal")
+            .from("journal_entries")
             .select("*")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     // Delete all journal entries
     if (body.action === "delete_all_journal") {
         const { error } = await supabase
-            .from("mood_journal")
+            .from("journal_entries")
             .delete()
             .eq("user_id", user.id);
 

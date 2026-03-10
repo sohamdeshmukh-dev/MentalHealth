@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import MoodEntryForm from "@/components/MoodEntryForm";
 import { MOODS } from "@/lib/types";
 
@@ -12,24 +13,36 @@ interface JournalEntry {
 }
 
 export default function JournalPage() {
-    const [entries, setEntries] = useState<JournalEntry[]>([]);
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const fetchEntries = useCallback(async () => {
         try {
-            const res = await fetch("/api/journal");
-            if (res.ok) {
-                const data = await res.json();
-                setEntries(Array.isArray(data) ? data : []);
-            }
-        } catch (err) {
-            console.error("Error fetching journal:", err);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from("journal_entries")
+                .select("*")
+                .eq("user_id", user.id)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setJournalEntries(data || []);
+        } catch (err: any) {
+            console.error("Error fetching journal:", err?.message || err?.details || JSON.stringify(err) || "Unknown Error");
+            alert("Failed to load journal: " + (err?.message || "Check console for details"));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [supabase]);
 
     useEffect(() => {
         fetchEntries();
@@ -38,15 +51,35 @@ export default function JournalPage() {
     async function handleSubmit(entry: { mood: string; journal_text: string }) {
         setIsSubmitting(true);
         try {
-            const res = await fetch("/api/journal", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(entry),
-            });
-            if (res.ok) {
-                const newEntry = await res.json();
-                setEntries((prev) => [newEntry, ...prev]);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user?.id) {
+                alert("Wait! User is not fully loaded yet.");
+                return;
             }
+            if (!entry.mood) {
+                alert("Please select a mood before saving!");
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("journal_entries")
+                .insert({
+                    user_id: user.id,
+                    mood: entry.mood,
+                    journal_text: entry.journal_text
+                })
+                .select()
+                .single();
+
+            if (error) {
+                const errorMsg = error?.message || error?.details || JSON.stringify(error) || "Unknown Error";
+                console.error("Error saving journal:", errorMsg);
+                alert("Failed to save entry: " + errorMsg);
+                return;
+            }
+
+            setJournalEntries((prev) => [data, ...prev]);
         } catch (err) {
             console.error("Error saving journal entry:", err);
         } finally {
@@ -57,14 +90,22 @@ export default function JournalPage() {
     async function handleDelete(id: string) {
         setDeletingId(id);
         try {
-            const res = await fetch("/api/journal", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id }),
-            });
-            if (res.ok) {
-                setEntries((prev) => prev.filter((e) => e.id !== id));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { error } = await supabase
+                .from("journal_entries")
+                .delete()
+                .eq("id", id)
+                .eq("user_id", user.id);
+
+            if (error) {
+                console.error("Error deleting entry:", error);
+                alert("Failed to delete entry!");
+                return;
             }
+
+            setJournalEntries((prev) => prev.filter((e) => e.id !== id));
         } catch (err) {
             console.error("Error deleting entry:", err);
         } finally {
@@ -74,7 +115,7 @@ export default function JournalPage() {
 
     // Calculate streak
     const streak = (() => {
-        if (entries.length === 0) return 0;
+        if (journalEntries.length === 0) return 0;
         let count = 0;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -83,7 +124,7 @@ export default function JournalPage() {
             const checkDate = new Date(today);
             checkDate.setDate(checkDate.getDate() - i);
             const dateStr = checkDate.toISOString().split("T")[0];
-            const hasEntry = entries.some(
+            const hasEntry = journalEntries.some(
                 (e) => new Date(e.created_at).toISOString().split("T")[0] === dateStr
             );
             if (hasEntry) {
@@ -119,14 +160,14 @@ export default function JournalPage() {
                         </div>
                     </div>
                     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-center backdrop-blur-sm">
-                        <div className="text-2xl font-bold text-indigo-400">{entries.length}</div>
+                        <div className="text-2xl font-bold text-indigo-400">{journalEntries.length}</div>
                         <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mt-1">
                             Total Entries
                         </div>
                     </div>
                     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-center backdrop-blur-sm">
                         <div className="text-2xl font-bold text-purple-400">
-                            {entries.filter((e) => {
+                            {journalEntries.filter((e) => {
                                 const d = new Date(e.created_at);
                                 const now = new Date();
                                 const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -155,7 +196,7 @@ export default function JournalPage() {
                             <div className="flex justify-center py-12">
                                 <div className="h-8 w-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
                             </div>
-                        ) : entries.length === 0 ? (
+                        ) : journalEntries.length === 0 ? (
                             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
                                 <div className="text-4xl mb-3">📝</div>
                                 <p className="text-slate-400 text-sm">
@@ -164,7 +205,7 @@ export default function JournalPage() {
                             </div>
                         ) : (
                             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                                {entries.map((entry) => {
+                                {journalEntries.map((entry) => {
                                     const moodConfig = MOODS.find((m) => m.label === entry.mood);
                                     return (
                                         <div
