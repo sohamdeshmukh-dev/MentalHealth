@@ -2,7 +2,8 @@
 
 interface LeaderboardEntry {
     id: string;
-    username: string;
+    display_name?: string;
+    unique_code: string;
     avatar_url?: string;
     entry_count: number;
     isCurrentUser?: boolean;
@@ -34,8 +35,8 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                 <div
                     key={entry.id}
                     className={`flex items-center gap-4 rounded-2xl border p-4 transition-colors ${entry.isCurrentUser
-                            ? "border-teal-500/30 bg-teal-500/[0.06]"
-                            : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
+                        ? "border-teal-500/30 bg-teal-500/[0.06]"
+                        : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]"
                         }`}
                 >
                     {/* Rank */}
@@ -56,12 +57,22 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
 
                     {/* Name */}
                     <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-white truncate">
-                            {entry.username}
-                            {entry.isCurrentUser && (
-                                <span className="ml-2 text-[10px] font-semibold text-teal-400 uppercase tracking-wider">
-                                    You
-                                </span>
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-white">
+                                    {entry.isCurrentUser
+                                        ? 'You'
+                                        : (entry.display_name || entry.unique_code)}
+                                </p>
+                                {entry.isCurrentUser && entry.display_name && (
+                                    <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                                        {entry.display_name}
+                                    </span>
+                                )}
+                            </div>
+                            {/* Only show the unique code as a subtitle if they have a display name OR if it's 'You' */}
+                            {(entry.display_name || entry.isCurrentUser) && (
+                                <p className="text-[11px] text-slate-400">#{entry.unique_code}</p>
                             )}
                         </div>
                     </div>

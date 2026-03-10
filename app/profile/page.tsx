@@ -25,6 +25,7 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [showAvatars, setShowAvatars] = useState(false);
     const [username, setUsername] = useState("");
+    const [displayName, setDisplayName] = useState("");
     const [savingUsername, setSavingUsername] = useState(false);
 
     const fetchProfile = useCallback(async () => {
@@ -34,6 +35,7 @@ export default function ProfilePage() {
                 const json = await res.json();
                 setData(json);
                 setUsername(json.profile?.username || "");
+                setDisplayName(json.profile?.display_name || "");
             }
         } catch (err) {
             console.error("Error loading profile:", err);
@@ -64,8 +66,27 @@ export default function ProfilePage() {
 
     async function handleSaveUsername() {
         setSavingUsername(true);
-        await handleUpdateProfile({ username });
-        setSavingUsername(false);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("No user found");
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ display_name: displayName })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            // Refresh local state
+            setData((prev: any) => ({
+                ...prev,
+                profile: { ...prev.profile, display_name: displayName }
+            }));
+        } catch (err: any) {
+            console.error("Error saving name:", err?.message || err?.details || JSON.stringify(err) || err);
+        } finally {
+            setSavingUsername(false);
+        }
     }
 
     async function handleAvatarSelect(url: string) {
@@ -201,8 +222,8 @@ export default function ProfilePage() {
                             <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
                                 <input
                                     type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
                                     placeholder="Set username..."
                                     className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-teal-500/40 focus:outline-none w-48 text-center sm:text-left"
                                 />

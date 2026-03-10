@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
     const allowedFields = [
-        "username", "anonymous_mode", "share_mood", "mood_visibility",
+        "username", "display_name", "anonymous_mode", "share_mood", "mood_visibility",
         "avatar_url", "hobbies", "favorite_movies", "favorite_music", "other_details",
     ];
 

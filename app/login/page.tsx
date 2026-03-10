@@ -3,6 +3,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 
+const generatePatientId = () => {
+    const nums = Math.floor(100000 + Math.random() * 900000);
+    const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    return `${nums}${letter}`;
+};
+
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -31,8 +37,16 @@ export default function LoginPage() {
         setLoading(true);
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
+                if (data?.user) {
+                    const newId = generatePatientId();
+                    const { error: profileError } = await supabase.from('profiles').insert({
+                        id: data.user.id,
+                        unique_code: newId
+                    });
+                    if (profileError) console.error('Failed to create initial profile:', profileError);
+                }
             } else {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;

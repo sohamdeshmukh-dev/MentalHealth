@@ -8,15 +8,15 @@ interface UserProfileDrawerProps {
     onClose: () => void;
 }
 
-const AVATARS = [
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Felix",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Luna",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Bot",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Max",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Leo",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Zoe",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Nala",
-    "https://api.dicebear.com/7.x/shapes/svg?seed=Oliver"
+const premiumAvatars = [
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1608222351212-18fe0ec7b13b?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1557672172-298e090bd0f1?q=80&w=200&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1604871000636-074fa5117945?q=80&w=200&auto=format&fit=crop'
 ];
 
 const generatePatientId = () => {
@@ -105,6 +105,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
                     favorite_music: profile.favorite_music,
                     other_details: profile.other_details,
                     avatar_url: profile.avatar_url,
+                    display_name: profile.display_name,
                 })
                 .eq("id", user.id);
             if (error) throw error;
@@ -189,7 +190,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
                                     onClick={() => setShowAvatars(!showAvatars)}
                                 >
                                     {profile.avatar_url ? (
-                                        <img src={profile.avatar_url} alt="Profile Persona" className="w-full h-full object-cover" />
+                                        <img src={profile.avatar_url} alt="Profile Persona" className="w-24 h-24 rounded-full object-cover shadow-[0_0_15px_rgba(0,0,0,0.5)] ring-2 ring-white/10 hover:ring-white/30 transition-all cursor-pointer" />
                                     ) : (
                                         <span className="text-5xl text-indigo-300/50">?</span>
                                     )}
@@ -203,17 +204,31 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
 
                                 {showAvatars && (
                                     <div className="grid grid-cols-4 gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10 shadow-xl backdrop-blur-md w-full animate-in zoom-in-95 duration-200">
-                                        {AVATARS.map((url, i) => (
+                                        {premiumAvatars.map((url, i) => (
                                             <div
                                                 key={i}
                                                 onClick={() => handleAvatarSelect(url)}
                                                 className="aspect-square bg-slate-800/80 rounded-xl overflow-hidden cursor-pointer hover:ring-2 ring-indigo-400 transition-all"
                                             >
-                                                <img src={url} alt={`Avatar option ${i + 1}`} className="w-full h-full object-cover" />
+                                                <img src={url} alt={`Avatar option ${i + 1}`} className="w-16 h-16 rounded-full object-cover shadow-lg ring-1 ring-white/10 hover:ring-indigo-400 hover:scale-105 transition-all cursor-pointer" />
                                             </div>
                                         ))}
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Display Name Section */}
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[10px] font-bold text-slate-400/80 uppercase tracking-widest px-1">Display Name</label>
+                                <div className="bg-slate-900/50 border border-white/5 rounded-xl p-3 focus-within:border-indigo-500/50 focus-within:bg-slate-900/80 transition-colors shadow-lg backdrop-blur-md">
+                                    <input
+                                        type="text"
+                                        value={profile.display_name || ""}
+                                        onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
+                                        className="w-full bg-transparent outline-none text-sm text-slate-200 placeholder:text-slate-500"
+                                        placeholder="Enter your profile name..."
+                                    />
+                                </div>
                             </div>
 
                             {/* Anonymous Tag */}
@@ -227,7 +242,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
                             <div className="space-y-0">
                                 <div className="bg-slate-900/50 border border-white/5 rounded-xl p-3 mb-4 focus-within:border-indigo-500/50 focus-within:bg-slate-900/80 transition-colors shadow-lg">
                                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                                        <span>🎨</span> My Passions
+                                        My Passions
                                     </label>
                                     <textarea
                                         value={profile.hobbies || ""}
@@ -239,7 +254,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
 
                                 <div className="bg-slate-900/50 border border-white/5 rounded-xl p-3 mb-4 focus-within:border-indigo-500/50 focus-within:bg-slate-900/80 transition-colors shadow-lg">
                                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                                        <span>🎬</span> Film Favourites
+                                        Film Favourites
                                     </label>
                                     <textarea
                                         value={profile.favorite_movies || ""}
@@ -251,7 +266,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
 
                                 <div className="bg-slate-900/50 border border-white/5 rounded-xl p-3 mb-4 focus-within:border-indigo-500/50 focus-within:bg-slate-900/80 transition-colors shadow-lg">
                                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                                        <span>🎵</span> My Soundtrack
+                                        My Soundtrack
                                     </label>
                                     <textarea
                                         value={profile.favorite_music || ""}
@@ -263,7 +278,7 @@ export default function UserProfileDrawer({ isOpen, onClose }: UserProfileDrawer
 
                                 <div className="bg-slate-900/50 border border-white/5 rounded-xl p-3 mb-4 focus-within:border-indigo-500/50 focus-within:bg-slate-900/80 transition-colors shadow-lg">
                                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                                        <span>🎯</span> My Goals & Triggers
+                                        My Goals & Triggers
                                     </label>
                                     <textarea
                                         value={profile.other_details || ""}
