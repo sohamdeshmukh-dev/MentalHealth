@@ -29,65 +29,30 @@ export default function FriendsPage() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            const res = await fetch("/api/friends");
+            if (!res.ok) throw new Error("Failed to fetch friends data");
+
+            const data = await res.json();
+
+            setAcceptedFriends(data.friends || []);
+            setPendingRequests(data.incoming_requests || []);
+            setSentRequests(data.sent_requests || []);
+            setMyEntryCount(data.my_entry_count || 0);
+
+            // Also get current user session for actions
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
             setCurrentUser(user);
 
-            const { data: allFriendships, error } = await supabase
-                .from('friendships')
-                .select(`
-                    id,
-                    user_id,
-                    friend_id,
-                    status,
-                    sender:profiles!friendships_user_id_fkey(id, unique_code, avatar_url, points, display_name),
-                    receiver:profiles!friendships_friend_id_fkey(id, unique_code, avatar_url, points, display_name)
-                `)
-                .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
-            if (error) throw error;
-
-            const incoming: any[] = [];
-            const sent: any[] = [];
-            const accepted: any[] = [];
-
-            allFriendships?.forEach((f) => {
-                const senderProfile = Array.isArray(f.sender) ? f.sender[0] : f.sender;
-                const receiverProfile = Array.isArray(f.receiver) ? f.receiver[0] : f.receiver;
-
-                if (f.status === 'pending') {
-                    if (f.friend_id === user.id) {
-                        // I am the receiver. The sender is the other person.
-                        incoming.push({ friendshipId: f.id, ...senderProfile });
-                    } else if (f.user_id === user.id) {
-                        // I am the sender. The receiver is the other person.
-                        sent.push({ friendshipId: f.id, ...receiverProfile });
-                    }
-                } else if (f.status === 'accepted') {
-                    // Get the profile of whoever is NOT the current user
-                    const friendProfile: any = f.user_id === user.id ? receiverProfile : senderProfile;
-                    accepted.push({
-                        id: f.id,
-                        friend_id: friendProfile?.id,
-                        profile: friendProfile,
-                        entry_count: 0
-                    });
-                }
-            });
-
-            setPendingRequests(incoming);
-            setSentRequests(sent);
-            setAcceptedFriends(accepted);
-
-            // Fetch current user profile and entry count
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('id, unique_code, avatar_url, display_name')
-                .eq('id', user.id)
-                .single();
-            setMyProfile(profile);
-            setMyEntryCount(0);
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id, unique_code, avatar_url, display_name')
+                    .eq('id', user.id)
+                    .single();
+                setMyProfile(profile);
+            }
         } catch (err: any) {
-            console.error("Error fetching friends:", err?.message || err?.details || err?.hint || JSON.stringify(err) || err);
+            console.error("Error fetching friends:", err);
         } finally {
             setIsLoading(false);
         }

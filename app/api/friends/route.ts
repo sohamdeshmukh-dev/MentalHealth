@@ -48,18 +48,27 @@ export async function GET() {
         .eq("addressee_id", user.id)
         .eq("status", "pending");
 
-    // Get profiles for friends
+    // Get pending requests sent by me
+    const { data: sentRequests } = await supabase
+        .from("friendships")
+        .select("*")
+        .eq("requester_id", user.id)
+        .eq("status", "pending");
+
+    // Get profiles for friends and requests
     const friendIds = (friends || []).map((f) =>
         f.requester_id === user.id ? f.addressee_id : f.requester_id
     );
-    const requestIds = (requests || []).map((r) => r.requester_id);
-    const allIds = [...new Set([...friendIds, ...requestIds])];
+    const receivedIds = (requests || []).map((r) => r.requester_id);
+    const sentIds = (sentRequests || []).map((r) => r.addressee_id);
+
+    const allIds = [...new Set([...friendIds, ...receivedIds, ...sentIds])];
 
     let profiles: Record<string, any> = {};
     if (allIds.length > 0) {
         const { data: profileData } = await supabase
             .from("profiles")
-            .select("id, username, avatar_url, unique_code")
+            .select("id, username, display_name, avatar_url, unique_code")
             .in("id", allIds);
 
         if (profileData) {
@@ -69,31 +78,68 @@ export async function GET() {
         }
     }
 
-    // Get journal entry counts for leaderboard
-    const { data: journalCounts } = await supabase
-        .from("journal_entries")
-        .select("user_id")
-        .in("user_id", [...friendIds, user.id]);
-
+    // Get journal entry counts for leaderboard (Combine multiple tables)
     const entryCounts: Record<string, number> = {};
-    (journalCounts || []).forEach((j: any) => {
-        entryCounts[j.user_id] = (entryCounts[j.user_id] || 0) + 1;
-    });
+    const relevantIds = [...new Set([...friendIds, user.id])];
+
+    if (relevantIds.length > 0) {
+        // 1. Text Journals
+        const { data: textCounts } = await supabase
+            .from("mood_journal")
+            .select("user_id")
+            .in("user_id", relevantIds);
+
+        // 2. Voice Journals
+        const { data: voiceCounts } = await supabase
+            .from("voice_journals")
+            .select("user_id")
+            .in("user_id", relevantIds);
+
+        (textCounts || []).forEach((j: any) => {
+            entryCounts[j.user_id] = (entryCounts[j.user_id] || 0) + 1;
+        });
+        (voiceCounts || []).forEach((j: any) => {
+            entryCounts[j.user_id] = (entryCounts[j.user_id] || 0) + 1;
+        });
+    }
 
     return NextResponse.json({
         friends: (friends || []).map((f) => {
             const friendId = f.requester_id === user.id ? f.addressee_id : f.requester_id;
+            const profile = profiles[friendId] || null;
             return {
                 ...f,
                 friend_id: friendId,
-                profile: profiles[friendId] || null,
+                profile: profile,
+                // Flatten point for UI if needed
+                display_name: profile?.display_name,
+                avatar_url: profile?.avatar_url,
+                unique_code: profile?.unique_code,
                 entry_count: entryCounts[friendId] || 0,
             };
         }),
-        requests: (requests || []).map((r) => ({
-            ...r,
-            profile: profiles[r.requester_id] || null,
-        })),
+        incoming_requests: (requests || []).map((r) => {
+            const profile = profiles[r.requester_id] || null;
+            return {
+                ...r,
+                friendshipId: r.id,
+                profile: profile,
+                display_name: profile?.display_name,
+                avatar_url: profile?.avatar_url,
+                unique_code: profile?.unique_code,
+            };
+        }),
+        sent_requests: (sentRequests || []).map((r) => {
+            const profile = profiles[r.addressee_id] || null;
+            return {
+                ...r,
+                friendshipId: r.id,
+                profile: profile,
+                display_name: profile?.display_name,
+                avatar_url: profile?.avatar_url,
+                unique_code: profile?.unique_code,
+            };
+        }),
         my_entry_count: entryCounts[user.id] || 0,
     });
 }
