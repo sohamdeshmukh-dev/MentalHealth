@@ -1,5 +1,15 @@
 export type Mood = "Happy" | "Calm" | "Neutral" | "Stressed" | "Sad" | "Overwhelmed";
 
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  mood: Mood;
+  journal_text: string;
+  image_url?: string;
+  location?: string;
+  created_at: string;
+}
+
 export interface CheckIn {
   id: string;
   mood: Mood;

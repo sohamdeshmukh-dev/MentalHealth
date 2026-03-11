@@ -88,3 +88,45 @@ html {
 .page-enter {
   animation: fade-in 0.3s ease-out;
 }
+
+/* Journal expand animation */
+@keyframes journal-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 800px;
+  }
+}
+
+.journal-expand {
+  animation: journal-expand 0.3s ease-out;
+}
+
+/* Toast notification */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
