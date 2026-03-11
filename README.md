@@ -1,6 +1,6 @@
 #To-Do List
 
-1) Real-Time Emotional Weather 
+✅1) Real-Time Emotional Weather 
 
 Examples:
 	•	Anxiety → storm clouds
@@ -22,7 +22,7 @@ Tech:
 	•	Mapbox layers
 	•	WebGL overlays
 
-2) Safe Spaces Finder
+✅2) Safe Spaces Finder
 
 Show places where people feel mentally safe.
 
@@ -41,7 +41,7 @@ Users can tag locations with:
 "good for studying"
 "stressful"
 
-3) Mood Journey Tracking
+✅3) Mood Journey Tracking
 Let users see their emotional patterns over time.
 
 Example dashboard:
@@ -78,7 +78,7 @@ Think:
 Reddit + Google Maps for emotions
 
 
-5) AI Therapist + AI Copilot Based on Location 🤖
+5-6) AI Therapist + AI Copilot Based on Location 🤖
 
 Combine map + AI therapist.
 
@@ -98,7 +98,7 @@ This is context-aware AI.
 
 7) AI mood Prediction(Individual/Community)
 
-8) Daily AI Reflection(With Image)
+✅8) Daily AI Reflection(With Image)
 After check-in:
 
 AI generates reflection.
@@ -160,7 +160,7 @@ Exam Week
 
 Watch emotional patterns shift.
 
-18) Friends Tab
+✅18) Friends Tab
 
 19) Stripe(monthly subscription)
 
@@ -168,19 +168,14 @@ Watch emotional patterns shift.
 
 21)Weather forecast(slider)
 
-22) UI section roller at the top of the screen to switch tabs from the mood section and friends
+✅22) UI section roller at the top of the screen to switch tabs from the mood section and friends
 
-23) Add an integration for college students to see their colleges on the map and their specific data sets for the college
+✅23) Add an integration for college students to see their colleges on the map and their specific data sets for the college
 
-24) Add some financial features for Capital One ( Ask AI for ideas)
+✅24) Add some financial features for Capital One ( Ask AI for ideas)
 
-25) IOS chat intergration into the friends tab
+✅25) IOS chat integration into the friends tab
     
-27) If you’re vibecoding and trying to build something crazy for a hackathon, the best ideas are ones that feel futuristic + interactive + AI-powered. You already have a strong base (map + AI therapist + check-ins). To really elevate it, add features that make people say “whoa” in the demo.
-
-Here are next-level ideas you could add.
-
-⸻
 
 1. Emotion Trails (Your Emotional Footprint)
 
