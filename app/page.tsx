@@ -62,8 +62,8 @@ export default function Home() {
   const dominantCampus = checkins.find((c) => c.campus_name)?.campus_name;
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#050913] p-2 sm:p-4">
-      <div className="relative h-full w-full overflow-hidden rounded-[26px] border border-slate-800/90 shadow-2xl shadow-black/35 sm:rounded-[32px]">
+    <div className="h-screen w-full overflow-hidden bg-[var(--background)] p-2 sm:p-4">
+      <div className="relative h-full w-full overflow-hidden rounded-[26px] border border-[var(--border-soft)] shadow-2xl sm:rounded-[32px]">
         <Map3DView
           checkins={filteredCheckins}
           city={city}
@@ -71,14 +71,14 @@ export default function Home() {
         />
 
         <div className="pointer-events-auto absolute right-3 top-20 z-[50] flex flex-col items-end gap-2 sm:right-5 sm:top-5">
-          <div className="flex cursor-pointer rounded-full border border-slate-700/50 bg-slate-900/80 p-1 shadow-lg backdrop-blur-md">
+          <div className="flex cursor-pointer rounded-full border border-[var(--border-soft)] bg-[var(--surface-1)] p-1 shadow-lg backdrop-blur-md">
             {["All", "Morning", "Afternoon", "Evening", "Night"].map((f) => (
               <div
                 key={f}
                 onClick={() => setTimeFilter(f)}
                 className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition-colors sm:px-4 sm:text-xs ${timeFilter === f
                   ? "bg-indigo-600 text-white shadow"
-                  : "text-slate-400 hover:text-slate-200"
+                  : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
                   }`}
               >
                 {f}
@@ -91,7 +91,7 @@ export default function Home() {
               onClick={() => setIsCampusMode(!isCampusMode)}
               className={`rounded-full border px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors ${isCampusMode
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
-                : "border-slate-700/50 bg-slate-900/80 text-slate-300 hover:bg-slate-800"
+                : "border-[var(--border-soft)] bg-[var(--surface-1)] text-[var(--muted-text)] hover:bg-[var(--surface-2)]"
                 }`}
             >
               🎓 Focus on Campus: {dominantCampus}

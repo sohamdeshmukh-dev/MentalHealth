@@ -3,7 +3,41 @@
 :root {
   --background: #050913;
   --foreground: #e2e8f0;
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.02);
+  --surface-3: rgba(255, 255, 255, 0.06);
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --muted-text: #94a3b8;
+  --subtle-text: #64748b;
+  --panel-shadow: 0 10px 36px rgba(2, 6, 23, 0.45);
   --navbar-height: 0px;
+}
+
+html.dark {
+  --background: #050913;
+  --foreground: #e2e8f0;
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.02);
+  --surface-3: rgba(255, 255, 255, 0.06);
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --muted-text: #94a3b8;
+  --subtle-text: #64748b;
+  --panel-shadow: 0 10px 36px rgba(2, 6, 23, 0.45);
+}
+
+html.light {
+  --background: #f3f6fb;
+  --foreground: #0f172a;
+  --surface-1: rgba(255, 255, 255, 0.92);
+  --surface-2: rgba(226, 232, 240, 0.72);
+  --surface-3: rgba(148, 163, 184, 0.16);
+  --border-soft: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --muted-text: #475569;
+  --subtle-text: #64748b;
+  --panel-shadow: 0 10px 28px rgba(148, 163, 184, 0.35);
 }
 
 @theme inline {
@@ -17,10 +51,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   margin: 0;
+  transition: background-color 240ms ease, color 200ms ease;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+.app-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--panel-shadow);
 }
 
 /* Mapbox popup — dark theme */

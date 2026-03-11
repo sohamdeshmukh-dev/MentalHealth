@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import ProfileSafetyPanel from "@/components/ProfileSafetyPanel";
+import { useTheme } from "@/hooks/useTheme";
 
 const AVATARS = [
     "https://api.dicebear.com/7.x/shapes/svg?seed=Felix",
@@ -31,6 +32,7 @@ export default function ProfilePage() {
     const [savingUsername, setSavingUsername] = useState(false);
     const [shieldActive, setShieldActive] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const { theme, setTheme, toggleTheme } = useTheme();
 
     const fetchProfileData = useCallback(async () => {
         try {
@@ -253,27 +255,64 @@ export default function ProfilePage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#050913] flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
                 <div className="h-10 w-10 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#050913] page-enter">
+        <div className="min-h-screen bg-[var(--background)] page-enter">
             <div className="mx-auto max-w-3xl px-4 pb-8 pt-24 sm:px-6">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                    <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
                         <span className="bg-gradient-to-r from-teal-400 to-violet-400 bg-clip-text text-transparent">
                             Profile & Safety
                         </span>
                     </h1>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-[var(--muted-text)]">
                         Manage your profile, safety tools, and privacy settings
                     </p>
                 </div>
 
-                <div className="mb-6 rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-sm">
+                <div className="mb-6 app-surface rounded-3xl p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-sm font-semibold text-[var(--foreground)]">Profile Settings</h2>
+                            <p className="mt-1 text-xs text-[var(--muted-text)]">Theme</p>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-1">
+                            <button
+                                onClick={() => setTheme("dark")}
+                                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                                    theme === "dark"
+                                        ? "bg-slate-900 text-white shadow"
+                                        : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
+                                }`}
+                            >
+                                Dark Mode
+                            </button>
+                            <button
+                                onClick={() => setTheme("light")}
+                                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                                    theme === "light"
+                                        ? "bg-white text-slate-900 shadow"
+                                        : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
+                                }`}
+                            >
+                                Light Mode
+                            </button>
+                            <button
+                                onClick={toggleTheme}
+                                className="rounded-xl border border-[var(--border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)] transition-colors hover:text-[var(--foreground)]"
+                            >
+                                Toggle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mb-6 app-surface rounded-3xl p-6">
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                         <div className="relative">
                             <div
@@ -363,7 +402,7 @@ export default function ProfilePage() {
                 <div className="mt-6">
                     <button
                         onClick={handleLogout}
-                        className="w-full rounded-2xl border border-red-500/30 bg-red-500/[0.06] py-3.5 text-sm font-semibold text-red-400 hover:bg-red-500/15 transition-all"
+                        className="w-full rounded-2xl border border-red-500/30 bg-red-500/[0.08] py-3.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-all"
                     >
                         Log Out
                     </button>
@@ -372,8 +411,8 @@ export default function ProfilePage() {
 
             {toastMessage && (
                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[90vw] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="rounded-2xl border border-white/10 bg-[#0a0f1d]/90 p-4 shadow-2xl backdrop-blur-md text-center">
-                        <div className="text-sm font-medium text-white leading-relaxed">
+                    <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-4 shadow-2xl backdrop-blur-md text-center">
+                        <div className="text-sm font-medium text-[var(--foreground)] leading-relaxed">
                             {toastMessage}
                         </div>
                     </div>

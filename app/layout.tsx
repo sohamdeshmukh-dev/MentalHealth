@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import ThemeProvider from "@/components/ThemeProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -20,14 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
-        className={`${inter.variable} antialiased bg-[#050913] text-slate-100 font-[family-name:var(--font-inter)]`}
+        className={`${inter.variable} antialiased bg-[var(--background)] text-[var(--foreground)] font-[family-name:var(--font-inter)]`}
       >
-        <Navbar />
-        <main>
-          {children}
-        </main>
+        <ThemeProvider>
+          <Navbar />
+          <main>
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );
