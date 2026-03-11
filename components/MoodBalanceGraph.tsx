@@ -22,6 +22,7 @@ interface MoodBalanceGraphProps {
 
 interface BalancePoint {
   id: string;
+  pointIndex: number;
   xLabel: string;
   dateLabel: string;
   emotion: JournalEntry["emotion"];
@@ -33,7 +34,7 @@ interface BalancePoint {
 
 interface TooltipContentProps {
   active?: boolean;
-  payload?: Array<{ payload: BalancePoint }>;
+  payload?: Array<{ payload: BalancePoint; dataKey?: string | number }>;
 }
 
 function formatXAxisDate(input: string) {
@@ -61,7 +62,8 @@ function BalanceTooltip({ active, payload }: TooltipContentProps) {
     return null;
   }
 
-  const point = payload[0]?.payload;
+  const scoreItem = payload.find((item) => item.dataKey === "score");
+  const point = scoreItem?.payload ?? payload[0]?.payload;
   if (!point) {
     return null;
   }
@@ -70,7 +72,7 @@ function BalanceTooltip({ active, payload }: TooltipContentProps) {
     <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-3 shadow-[var(--panel-shadow)] backdrop-blur-md">
       <p className="text-sm font-semibold text-[var(--foreground)]">{point.emotion}</p>
       <p className="mt-1 text-xs text-[var(--muted-text)]">Intensity: {point.intensity}</p>
-      <p className="text-xs text-[var(--muted-text)]">Score: {formatScore(point.score)}</p>
+      <p className="text-xs text-[var(--muted-text)]">Generated Score: {formatScore(point.score)}</p>
       <p className="mt-1 text-[11px] text-[var(--subtle-text)]">{point.dateLabel}</p>
     </div>
   );
@@ -93,10 +95,11 @@ export default function MoodBalanceGraph({ entries }: MoodBalanceGraphProps) {
   const points = useMemo<BalancePoint[]>(() => {
     return [...entries]
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .map((entry) => {
+      .map((entry, index) => {
         const score = getEmotionalBalanceScore(entry.emotion, entry.intensity);
         return {
           id: entry.id,
+          pointIndex: index,
           xLabel: formatXAxisDate(entry.createdAt),
           dateLabel: formatTooltipDate(entry.createdAt),
           emotion: entry.emotion,
@@ -161,7 +164,11 @@ export default function MoodBalanceGraph({ entries }: MoodBalanceGraphProps) {
             </defs>
 
             <XAxis
-              dataKey="xLabel"
+              dataKey="pointIndex"
+              type="number"
+              domain={[0, Math.max(points.length - 1, 0)]}
+              allowDecimals={false}
+              tickFormatter={(value: number) => points[Math.round(value)]?.xLabel ?? ""}
               tickLine={false}
               axisLine={{ stroke: "var(--border-soft)" }}
               tick={{ fill: "var(--muted-text)", fontSize: 11 }}
