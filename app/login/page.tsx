@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { CITIES } from '@/lib/types';
+import { ALL_COLLEGES, getCollegeLogoUrl, findCollegeByName } from '@/lib/collegeList';
+import CollegeLogo from '@/components/CollegeLogo';
 
 const generatePatientId = () => {
     const nums = Math.floor(100000 + Math.random() * 900000);
@@ -16,13 +18,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
     const [selectedCity, setSelectedCity] = useState('');
-    const [selectedCollegeId, setSelectedCollegeId] = useState('');
-    const [colleges, setColleges] = useState<Array<{
-        id: string;
-        name: string;
-        city: string;
-    }>>([]);
-    const [isLoadingColleges, setIsLoadingColleges] = useState(false);
+    const [selectedCollegeName, setSelectedCollegeName] = useState('');
     const router = useRouter();
 
     const supabase = useMemo(() => createBrowserClient(
@@ -41,58 +37,10 @@ export default function LoginPage() {
         return () => subscription.unsubscribe();
     }, [router, supabase.auth]);
 
-    useEffect(() => {
-        if (!isSignUp || colleges.length > 0) {
-            return;
-        }
-
-        let isMounted = true;
-        setIsLoadingColleges(true);
-
-        fetch('/api/colleges')
-            .then(async (response) => {
-                if (!response.ok) {
-                    throw new Error('Failed to load colleges');
-                }
-                const payload = await response.json();
-                if (!isMounted) {
-                    return;
-                }
-                setColleges(Array.isArray(payload?.colleges) ? payload.colleges : []);
-            })
-            .catch((error) => {
-                console.error(error);
-                if (isMounted) {
-                    setColleges([]);
-                }
-            })
-            .finally(() => {
-                if (isMounted) {
-                    setIsLoadingColleges(false);
-                }
-            });
-
-        return () => {
-            isMounted = false;
-        };
-    }, [colleges.length, isSignUp]);
-
     const filteredColleges = useMemo(() => {
-        if (!selectedCity) {
-            return [];
-        }
-        return colleges.filter((college) => college.city === selectedCity);
-    }, [colleges, selectedCity]);
-
-    useEffect(() => {
-        if (!selectedCollegeId) {
-            return;
-        }
-        const selectedCollege = filteredColleges.find((college) => college.id === selectedCollegeId);
-        if (!selectedCollege) {
-            setSelectedCollegeId('');
-        }
-    }, [filteredColleges, selectedCollegeId]);
+        if (!selectedCity) return [];
+        return ALL_COLLEGES.filter((c) => c.city === selectedCity);
+    }, [selectedCity]);
 
     const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -103,12 +51,29 @@ export default function LoginPage() {
                 if (error) throw error;
                 if (data?.user) {
                     const newId = generatePatientId();
-                    const selectedCollege = colleges.find((college) => college.id === selectedCollegeId);
+
+                    // Resolve college DB id by name (if selected)
+                    let resolvedCollegeId: string | null = null;
+                    if (selectedCollegeName && selectedCity) {
+                        try {
+                            const res = await fetch(`/api/colleges?city=${encodeURIComponent(selectedCity)}&q=${encodeURIComponent(selectedCollegeName)}`);
+                            if (res.ok) {
+                                const payload = await res.json();
+                                const match = (payload.colleges ?? []).find(
+                                    (c: { name: string }) => c.name === selectedCollegeName
+                                );
+                                resolvedCollegeId = match?.id ?? null;
+                            }
+                        } catch {
+                            // DB may not have colleges table yet — save without college_id
+                        }
+                    }
+
                     const { error: profileError } = await supabase.from('profiles').insert({
                         id: data.user.id,
                         unique_code: newId,
-                        college_id: selectedCollege?.id ?? null,
-                        city: selectedCollege?.city ?? (selectedCity || null),
+                        college_id: resolvedCollegeId,
+                        city: selectedCity || null,
                     });
                     if (profileError) console.error('Failed to create initial profile:', profileError);
                 }
@@ -185,26 +150,49 @@ export default function LoginPage() {
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-300">College</label>
-                                <select
-                                    value={selectedCollegeId}
-                                    onChange={(e) => setSelectedCollegeId(e.target.value)}
-                                    disabled={!selectedCity || isLoadingColleges}
-                                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 p-2.5 text-slate-100 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    <option value="">
-                                        {isLoadingColleges
-                                            ? 'Loading colleges...'
-                                            : selectedCity
-                                                ? 'Select college (optional)'
-                                                : 'Choose city first'}
-                                    </option>
-                                    {filteredColleges.map((college) => (
-                                        <option key={college.id} value={college.id}>
-                                            {college.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <label className="mb-1 block text-sm font-medium text-slate-300">
+                                    College {selectedCity ? `(${filteredColleges.length} available)` : ''}
+                                </label>
+                                {!selectedCity ? (
+                                    <p className="rounded-lg border border-slate-700 bg-slate-900/50 p-2.5 text-sm text-slate-500">
+                                        Choose city first
+                                    </p>
+                                ) : (
+                                    <div className="max-h-[180px] overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/50">
+                                        {/* Skip / no college option */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedCollegeName('')}
+                                            className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                                                selectedCollegeName === ''
+                                                    ? 'bg-indigo-600/20 text-indigo-300'
+                                                    : 'text-slate-400 hover:bg-slate-800'
+                                            }`}
+                                        >
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs">—</span>
+                                            <span>Skip (no college)</span>
+                                        </button>
+                                        {filteredColleges.map((college) => (
+                                            <button
+                                                type="button"
+                                                key={`${college.city}-${college.name}`}
+                                                onClick={() => setSelectedCollegeName(college.name)}
+                                                className={`flex w-full items-center gap-2.5 border-t border-slate-800/50 px-3 py-2 text-left text-sm transition-colors ${
+                                                    selectedCollegeName === college.name
+                                                        ? 'bg-indigo-600/20 text-indigo-300'
+                                                        : 'text-slate-200 hover:bg-slate-800'
+                                                }`}
+                                            >
+                                                {selectedCollegeName === college.name ? (
+                                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/30 text-xs text-indigo-300">✓</span>
+                                                ) : (
+                                                    <CollegeLogo collegeName={college.name} size={24} />
+                                                )}
+                                                <span className="truncate">{college.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -237,7 +225,7 @@ export default function LoginPage() {
                         onClick={() => {
                             setIsSignUp(!isSignUp);
                             setSelectedCity('');
-                            setSelectedCollegeId('');
+                            setSelectedCollegeName('');
                         }}
                         className="font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none"
                     >

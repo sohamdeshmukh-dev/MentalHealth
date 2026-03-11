@@ -45,7 +45,9 @@ CREATE INDEX IF NOT EXISTS colleges_city_idx ON public.colleges(city);
 -- 2) Link profiles to colleges
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS college_id UUID,
-  ADD COLUMN IF NOT EXISTS city TEXT;
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS major TEXT,
+  ADD COLUMN IF NOT EXISTS grade TEXT;
 
 DO $$
 BEGIN

@@ -10,6 +10,7 @@ import {
   CITIES,
   College,
 } from "@/lib/types";
+import { generateSeedCheckins } from "@/lib/seedCheckins";
 
 const Map3DView = dynamic(() => import("@/components/Map3DView"), {
   ssr: false,
@@ -82,7 +83,9 @@ export default function Home() {
     fetch(`/api/colleges?city=${encodeURIComponent(city.name)}`)
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Unable to fetch city campuses.");
+          // colleges table may not exist yet — silently fall back
+          if (isMounted) setCityColleges([]);
+          return;
         }
         const payload = await response.json();
         if (!isMounted) {
@@ -90,8 +93,7 @@ export default function Home() {
         }
         setCityColleges(Array.isArray(payload?.colleges) ? payload.colleges : []);
       })
-      .catch((error) => {
-        console.error(error);
+      .catch(() => {
         if (isMounted) {
           setCityColleges([]);
         }
@@ -113,7 +115,8 @@ export default function Home() {
     fetch(`/api/campus/${encodeURIComponent(registeredCollege.id)}/emotions`)
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Unable to fetch campus emotional insights.");
+          if (isMounted) setCampusInsights(null);
+          return;
         }
         const payload = await response.json();
         if (!isMounted) {
@@ -121,8 +124,7 @@ export default function Home() {
         }
         setCampusInsights(payload as CampusEmotionResponse);
       })
-      .catch((error) => {
-        console.error(error);
+      .catch(() => {
         if (isMounted) {
           setCampusInsights(null);
         }
@@ -151,8 +153,12 @@ export default function Home() {
 
   const effectiveCampusName = registeredCollege?.name ?? checkins.find((checkin) => checkin.campus_name)?.campus_name;
 
+  // Generate deterministic seed points for the current city so weather
+  // overlays always have enough data to display emotional weather events.
+  const seedPoints = useMemo(() => generateSeedCheckins(city), [city]);
+
   const filteredCheckins = useMemo(() => {
-    return checkins.filter((checkin) => {
+    const realFiltered = checkins.filter((checkin) => {
       if (isCampusMode) {
         if (registeredCollege?.id) {
           const matchesId = checkin.college_id === registeredCollege.id;
@@ -173,7 +179,21 @@ export default function Home() {
       if (timeFilter === "Night") return hour >= 21 || hour < 5;
       return true;
     });
-  }, [checkins, isCampusMode, registeredCollege?.id, registeredCollege?.name, timeFilter]);
+
+    // Merge seed points (they also respect time filter)
+    const filteredSeeds = timeFilter === "All"
+      ? seedPoints
+      : seedPoints.filter((checkin) => {
+          const hour = new Date(checkin.timestamp).getHours();
+          if (timeFilter === "Morning") return hour >= 5 && hour < 12;
+          if (timeFilter === "Afternoon") return hour >= 12 && hour < 17;
+          if (timeFilter === "Evening") return hour >= 17 && hour < 21;
+          if (timeFilter === "Night") return hour >= 21 || hour < 5;
+          return true;
+        });
+
+    return [...realFiltered, ...filteredSeeds];
+  }, [checkins, isCampusMode, registeredCollege?.id, registeredCollege?.name, timeFilter, seedPoints]);
 
   return (
     <div className="h-screen w-full overflow-hidden bg-[var(--background)] p-2 sm:p-4">

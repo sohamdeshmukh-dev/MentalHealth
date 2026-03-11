@@ -32,8 +32,30 @@ interface ScreenCluster {
   alpha: number;
 }
 
-const MAX_RENDERED = 24;
+/* ── Raindrop & Particle pools ─────────────────────────────────── */
+interface Raindrop {
+  xOff: number;   // -0.5..0.5 relative to cluster center
+  phase: number;  // 0..1 animation phase
+  speed: number;  // multiplier
+  size: number;   // length multiplier
+  opacity: number;
+}
 
+interface Particle {
+  angle: number;
+  dist: number;    // 0..1 from center
+  phase: number;
+  size: number;
+  speed: number;
+  drift: number;
+}
+
+const MAX_RENDERED = 24;
+const RAIN_PER_CLUSTER = 42;
+const SPARKLE_PER_CLUSTER = 18;
+const CALM_PARTICLE_COUNT = 14;
+
+/* ── Deterministic hash ────────────────────────────────────────── */
 function hash(value: string) {
   let result = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -48,33 +70,174 @@ function hash(value: string) {
   return (result >>> 0) / 4294967295;
 }
 
+function seededRandom(seed: number, index: number) {
+  const x = Math.sin(seed * 9301 + index * 49297 + 233280.5) * 49297;
+  return x - Math.floor(x);
+}
+
 function metersPerPixel(lat: number, zoom: number) {
-  return 156543.03392 * Math.cos((lat * Math.PI) / 180) / Math.pow(2, zoom);
+  return (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
 }
 
-function drawCloud(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
+/* ── Pre-generate particle pools per cluster ───────────────────── */
+const rainPools = new Map<string, Raindrop[]>();
+const sparklePools = new Map<string, Particle[]>();
+const calmPools = new Map<string, Particle[]>();
+
+function getRainPool(id: string, intensity: number): Raindrop[] {
+  if (rainPools.has(id)) return rainPools.get(id)!;
+  const seed = hash(id) * 10000;
+  const count = Math.round(RAIN_PER_CLUSTER * Math.max(0.4, intensity));
+  const pool: Raindrop[] = [];
+  for (let i = 0; i < count; i++) {
+    pool.push({
+      xOff: seededRandom(seed, i) - 0.5,
+      phase: seededRandom(seed, i + 100),
+      speed: 0.6 + seededRandom(seed, i + 200) * 0.8,
+      size: 0.7 + seededRandom(seed, i + 300) * 0.6,
+      opacity: 0.25 + seededRandom(seed, i + 400) * 0.35,
+    });
+  }
+  rainPools.set(id, pool);
+  return pool;
+}
+
+function getSparklePool(id: string, intensity: number): Particle[] {
+  if (sparklePools.has(id)) return sparklePools.get(id)!;
+  const seed = hash(id) * 10000;
+  const count = Math.round(SPARKLE_PER_CLUSTER * Math.max(0.5, intensity));
+  const pool: Particle[] = [];
+  for (let i = 0; i < count; i++) {
+    pool.push({
+      angle: seededRandom(seed, i) * Math.PI * 2,
+      dist: 0.3 + seededRandom(seed, i + 100) * 0.6,
+      phase: seededRandom(seed, i + 200),
+      size: 1.5 + seededRandom(seed, i + 300) * 2.5,
+      speed: 0.3 + seededRandom(seed, i + 400) * 0.7,
+      drift: (seededRandom(seed, i + 500) - 0.5) * 2,
+    });
+  }
+  sparklePools.set(id, pool);
+  return pool;
+}
+
+function getCalmPool(id: string): Particle[] {
+  if (calmPools.has(id)) return calmPools.get(id)!;
+  const seed = hash(id) * 10000;
+  const pool: Particle[] = [];
+  for (let i = 0; i < CALM_PARTICLE_COUNT; i++) {
+    pool.push({
+      angle: seededRandom(seed, i) * Math.PI * 2,
+      dist: 0.35 + seededRandom(seed, i + 100) * 0.55,
+      phase: seededRandom(seed, i + 200),
+      size: 1.2 + seededRandom(seed, i + 300) * 1.8,
+      speed: 0.15 + seededRandom(seed, i + 400) * 0.25,
+      drift: (seededRandom(seed, i + 500) - 0.5) * 1.5,
+    });
+  }
+  calmPools.set(id, pool);
+  return pool;
+}
+
+/* ── Soft rounded cloud (cartoony, multi-layered) ──────────────── */
+function drawSoftCloud(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
   color: string,
-  alpha: number
+  shadowColor: string,
+  alpha: number,
+  time: number,
+  seed: number
 ) {
-  context.save();
-  context.globalAlpha = alpha;
-  context.fillStyle = color;
+  ctx.save();
+  ctx.globalAlpha = alpha;
 
-  context.beginPath();
-  context.arc(x - radius * 0.42, y + radius * 0.05, radius * 0.44, 0, Math.PI * 2);
-  context.arc(x, y - radius * 0.16, radius * 0.52, 0, Math.PI * 2);
-  context.arc(x + radius * 0.45, y + radius * 0.04, radius * 0.4, 0, Math.PI * 2);
-  context.closePath();
-  context.fill();
-  context.restore();
+  // Subtle drift
+  const drift = Math.sin(time * 0.2 + seed * 5) * w * 0.02;
+  const x = cx + drift;
+
+  // Shadow layer (slightly offset down)
+  const shadowGrad = ctx.createRadialGradient(x, cy + h * 0.15, w * 0.1, x, cy + h * 0.15, w * 0.7);
+  shadowGrad.addColorStop(0, shadowColor);
+  shadowGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = shadowGrad;
+  ctx.beginPath();
+  ctx.ellipse(x, cy + h * 0.15, w * 0.65, h * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Main cloud body — overlapping ellipses for puffy look
+  ctx.fillStyle = color;
+
+  // Bottom-left puff
+  ctx.beginPath();
+  ctx.ellipse(x - w * 0.3, cy + h * 0.05, w * 0.32, h * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Bottom-right puff
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.28, cy + h * 0.07, w * 0.3, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Center-top puff (tallest)
+  ctx.beginPath();
+  ctx.ellipse(x, cy - h * 0.12, w * 0.38, h * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small top-right accent puff
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.15, cy - h * 0.08, w * 0.22, h * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Highlight on top
+  const highlightGrad = ctx.createRadialGradient(x - w * 0.08, cy - h * 0.2, 0, x, cy, w * 0.35);
+  highlightGrad.addColorStop(0, `rgba(255,255,255,${0.12 * alpha})`);
+  highlightGrad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = highlightGrad;
+  ctx.beginPath();
+  ctx.ellipse(x, cy - h * 0.08, w * 0.3, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
+/* ── Draw 4-pointed sparkle star ───────────────────────────────── */
+function drawSparkle(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  alpha: number,
+  color: string
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+
+  // Glow behind sparkle
+  ctx.shadowColor = color;
+  ctx.shadowBlur = size * 3;
+
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.quadraticCurveTo(x + size * 0.15, y - size * 0.15, x + size, y);
+  ctx.quadraticCurveTo(x + size * 0.15, y + size * 0.15, x, y + size);
+  ctx.quadraticCurveTo(x - size * 0.15, y + size * 0.15, x - size, y);
+  ctx.quadraticCurveTo(x - size * 0.15, y - size * 0.15, x, y - size);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ANXIETY STORM
+   ══════════════════════════════════════════════════════════════════ */
 function drawAnxietyEvent(
-  context: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D,
   cluster: EmotionCluster,
   x: number,
   y: number,
@@ -83,54 +246,133 @@ function drawAnxietyEvent(
   time: number
 ) {
   const seed = hash(cluster.id);
-  const pulse = 0.55 + Math.sin(time * 1.4 + seed * 8) * 0.09;
+  const pulse = 0.6 + Math.sin(time * 1.2 + seed * 8) * 0.08;
 
-  const gradient = context.createRadialGradient(x, y, radius * 0.28, x, y, radius * 1.15);
-  gradient.addColorStop(0, `rgba(30,41,59,${0.24 * pulse * alpha})`);
-  gradient.addColorStop(1, "rgba(15,23,42,0)");
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.arc(x, y, radius * 1.2, 0, Math.PI * 2);
-  context.fill();
+  // Background atmospheric haze
+  const haze = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius * 1.4);
+  haze.addColorStop(0, `rgba(30,27,45,${0.3 * pulse * alpha})`);
+  haze.addColorStop(0.5, `rgba(20,15,35,${0.15 * alpha})`);
+  haze.addColorStop(1, "rgba(15,10,25,0)");
+  ctx.fillStyle = haze;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+  ctx.fill();
 
-  drawCloud(context, x, y, radius * 0.72, "#1f2937", alpha * 0.85);
-  drawCloud(context, x + radius * 0.18, y - radius * 0.08, radius * 0.58, "#111827", alpha * 0.78);
+  // Dark storm clouds — multiple layers for depth
+  drawSoftCloud(
+    ctx, x - radius * 0.15, y - radius * 0.05,
+    radius * 0.9, radius * 0.5,
+    "rgba(25,25,40,0.92)", "rgba(10,10,20,0.4)",
+    alpha * 0.9, time, seed
+  );
+  drawSoftCloud(
+    ctx, x + radius * 0.2, y + radius * 0.02,
+    radius * 0.75, radius * 0.4,
+    "rgba(35,30,50,0.88)", "rgba(15,12,25,0.35)",
+    alpha * 0.8, time, seed + 1
+  );
+  // Front accent cloud
+  drawSoftCloud(
+    ctx, x - radius * 0.05, y + radius * 0.08,
+    radius * 0.55, radius * 0.3,
+    "rgba(45,40,60,0.75)", "rgba(20,18,30,0.3)",
+    alpha * 0.65, time, seed + 2
+  );
 
-  const windCount = 5 + Math.round(cluster.intensity * 6);
-  context.save();
-  context.strokeStyle = `rgba(148,163,184,${0.17 * alpha})`;
-  context.lineWidth = 1.2;
-  for (let i = 0; i < windCount; i += 1) {
-    const phase = time * 0.5 + i * 0.9 + seed * 10;
-    const yOffset = Math.sin(phase) * radius * 0.16;
-    const xStart = x - radius * 1.1 + ((phase * 32) % (radius * 2.2));
-    context.beginPath();
-    context.moveTo(xStart, y + yOffset);
-    context.lineTo(xStart + radius * 0.32, y + yOffset - radius * 0.06);
-    context.stroke();
+  // Wind streaks
+  const windCount = 5 + Math.round(cluster.intensity * 7);
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (let i = 0; i < windCount; i++) {
+    const phase = time * 0.6 + i * 0.8 + seed * 10;
+    const yOff = Math.sin(phase) * radius * 0.14;
+    const xStart = x - radius * 1.2 + ((phase * 38) % (radius * 2.4));
+    const len = radius * (0.2 + seededRandom(seed * 100, i) * 0.2);
+    const windAlpha = 0.08 + seededRandom(seed * 100, i + 50) * 0.1;
+
+    ctx.strokeStyle = `rgba(160,170,200,${windAlpha * alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(xStart, y + yOff + radius * 0.25);
+    ctx.bezierCurveTo(
+      xStart + len * 0.3, y + yOff + radius * 0.23,
+      xStart + len * 0.7, y + yOff + radius * 0.27,
+      xStart + len, y + yOff + radius * 0.24
+    );
+    ctx.stroke();
   }
-  context.restore();
+  ctx.restore();
 
-  const lightningPhase = (time + seed * 4.2) % 5.6;
-  if (lightningPhase > 5.18) {
-    context.save();
-    context.strokeStyle = `rgba(250,204,21,${0.85 * alpha})`;
-    context.shadowColor = "rgba(250,204,21,0.7)";
-    context.shadowBlur = 12;
-    context.lineWidth = 2;
+  // Lightning bolt with glow
+  const lightningCycle = (time + seed * 4.2) % 6.0;
+  if (lightningCycle > 5.55) {
+    const flash = Math.min(1, (lightningCycle - 5.55) / 0.15);
 
-    context.beginPath();
-    context.moveTo(x + radius * 0.12, y + radius * 0.1);
-    context.lineTo(x - radius * 0.05, y + radius * 0.44);
-    context.lineTo(x + radius * 0.15, y + radius * 0.42);
-    context.lineTo(x, y + radius * 0.78);
-    context.stroke();
-    context.restore();
+    // Screen flash
+    const flashGrad = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.3);
+    flashGrad.addColorStop(0, `rgba(200,180,255,${0.12 * flash * alpha})`);
+    flashGrad.addColorStop(1, "rgba(200,180,255,0)");
+    ctx.fillStyle = flashGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bolt
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,240,180,${0.95 * alpha * flash})`;
+    ctx.shadowColor = "rgba(255,230,150,0.9)";
+    ctx.shadowBlur = 18;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const bx = x + radius * 0.08;
+    const by = y + radius * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx - radius * 0.08, by + radius * 0.28);
+    ctx.lineTo(bx + radius * 0.06, by + radius * 0.26);
+    ctx.lineTo(bx - radius * 0.04, by + radius * 0.55);
+    ctx.stroke();
+
+    // Branch
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(bx - radius * 0.08, by + radius * 0.28);
+    ctx.lineTo(bx - radius * 0.2, by + radius * 0.42);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Secondary lightning (offset timing)
+  const lightning2 = (time + seed * 7.1 + 2.8) % 8.0;
+  if (lightning2 > 7.7 && cluster.intensity > 0.6) {
+    const flash2 = Math.min(1, (lightning2 - 7.7) / 0.12);
+    ctx.save();
+    ctx.strokeStyle = `rgba(220,210,255,${0.7 * alpha * flash2})`;
+    ctx.shadowColor = "rgba(200,190,255,0.7)";
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = "round";
+
+    const bx2 = x - radius * 0.2;
+    const by2 = y + radius * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(bx2, by2);
+    ctx.lineTo(bx2 + radius * 0.05, by2 + radius * 0.2);
+    ctx.lineTo(bx2 - radius * 0.03, by2 + radius * 0.38);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   SADNESS RAIN
+   ══════════════════════════════════════════════════════════════════ */
 function drawSadnessEvent(
-  context: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D,
   cluster: EmotionCluster,
   x: number,
   y: number,
@@ -140,38 +382,76 @@ function drawSadnessEvent(
 ) {
   const seed = hash(cluster.id);
 
-  const gradient = context.createRadialGradient(x, y, radius * 0.22, x, y, radius * 1.2);
-  gradient.addColorStop(0, `rgba(100,116,139,${0.2 * alpha})`);
-  gradient.addColorStop(1, "rgba(30,41,59,0)");
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.arc(x, y, radius * 1.15, 0, Math.PI * 2);
-  context.fill();
+  // Melancholy atmospheric glow
+  const atmo = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.35);
+  atmo.addColorStop(0, `rgba(80,100,130,${0.2 * alpha})`);
+  atmo.addColorStop(0.6, `rgba(50,65,90,${0.1 * alpha})`);
+  atmo.addColorStop(1, "rgba(30,40,60,0)");
+  ctx.fillStyle = atmo;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.35, 0, Math.PI * 2);
+  ctx.fill();
 
-  drawCloud(context, x, y, radius * 0.68, "#64748b", alpha * 0.88);
-  drawCloud(context, x - radius * 0.14, y - radius * 0.05, radius * 0.52, "#94a3b8", alpha * 0.42);
+  // Soft grey clouds
+  drawSoftCloud(
+    ctx, x, y - radius * 0.08,
+    radius * 0.85, radius * 0.42,
+    "rgba(100,116,140,0.9)", "rgba(60,70,90,0.35)",
+    alpha * 0.9, time, seed
+  );
+  drawSoftCloud(
+    ctx, x + radius * 0.22, y + radius * 0.04,
+    radius * 0.6, radius * 0.32,
+    "rgba(120,130,155,0.75)", "rgba(70,80,100,0.25)",
+    alpha * 0.7, time, seed + 1
+  );
 
-  const dropCount = 10 + Math.round(cluster.intensity * 16);
-  context.save();
-  context.strokeStyle = `rgba(191,219,254,${0.38 * alpha})`;
-  context.lineWidth = 1.35;
+  // Rain drops from pool
+  const drops = getRainPool(cluster.id, cluster.intensity);
+  ctx.save();
+  ctx.lineCap = "round";
 
-  for (let i = 0; i < dropCount; i += 1) {
-    const phase = (time * 85 + i * 31 + seed * 910) % (radius * 1.55);
-    const xOffset = ((i / dropCount) - 0.5) * radius * 1.4;
-    const startY = y + radius * 0.2 - phase;
+  for (const drop of drops) {
+    const t = ((time * drop.speed * 0.9 + drop.phase) % 1);
+    const dropX = x + drop.xOff * radius * 1.2;
+    const dropY = y + radius * 0.18 + t * radius * 1.1;
 
-    context.beginPath();
-    context.moveTo(x + xOffset, startY);
-    context.lineTo(x + xOffset - radius * 0.03, startY + radius * 0.18);
-    context.stroke();
+    // Skip if above cloud or too far below
+    if (dropY < y - radius * 0.1 || dropY > y + radius * 1.3) continue;
+
+    // Fade in/out at top and bottom
+    const fadeIn = Math.min(1, (dropY - (y + radius * 0.15)) / (radius * 0.15));
+    const fadeOut = Math.max(0, 1 - (dropY - (y + radius * 0.9)) / (radius * 0.4));
+    const dropAlpha = drop.opacity * alpha * fadeIn * fadeOut;
+
+    if (dropAlpha < 0.02) continue;
+
+    const len = radius * 0.12 * drop.size;
+    ctx.strokeStyle = `rgba(170,195,230,${dropAlpha})`;
+    ctx.lineWidth = 1.2 * drop.size;
+    ctx.beginPath();
+    ctx.moveTo(dropX, dropY);
+    ctx.lineTo(dropX - radius * 0.01, dropY + len);
+    ctx.stroke();
+
+    // Tiny splash at bottom
+    if (t > 0.85) {
+      const splashAlpha = dropAlpha * ((t - 0.85) / 0.15);
+      const splashR = radius * 0.025 * drop.size;
+      ctx.fillStyle = `rgba(170,195,230,${splashAlpha * 0.5})`;
+      ctx.beginPath();
+      ctx.ellipse(dropX, y + radius * 1.25, splashR * 2, splashR * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
-
-  context.restore();
+  ctx.restore();
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   CALM SUNSHINE
+   ══════════════════════════════════════════════════════════════════ */
 function drawCalmEvent(
-  context: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D,
   cluster: EmotionCluster,
   x: number,
   y: number,
@@ -180,64 +460,91 @@ function drawCalmEvent(
   time: number
 ) {
   const seed = hash(cluster.id);
-  const breathe = 0.95 + Math.sin(time * 0.8 + seed * 5.8) * 0.06;
+  const breathe = 0.92 + Math.sin(time * 0.6 + seed * 5.8) * 0.08;
 
-  const glow = context.createRadialGradient(x, y, radius * 0.18, x, y, radius * 1.24);
-  glow.addColorStop(0, `rgba(254,249,195,${0.25 * alpha * breathe})`);
-  glow.addColorStop(1, "rgba(45,212,191,0)");
-  context.fillStyle = glow;
-  context.beginPath();
-  context.arc(x, y, radius * 1.2, 0, Math.PI * 2);
-  context.fill();
+  // Warm ambient glow — multi-layer
+  const outerGlow = ctx.createRadialGradient(x, y, radius * 0.05, x, y, radius * 1.4);
+  outerGlow.addColorStop(0, `rgba(255,248,220,${0.2 * alpha * breathe})`);
+  outerGlow.addColorStop(0.3, `rgba(255,235,180,${0.12 * alpha * breathe})`);
+  outerGlow.addColorStop(0.7, `rgba(45,212,191,${0.06 * alpha})`);
+  outerGlow.addColorStop(1, "rgba(45,212,191,0)");
+  ctx.fillStyle = outerGlow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.4, 0, Math.PI * 2);
+  ctx.fill();
 
-  context.save();
-  context.strokeStyle = `rgba(253,224,71,${0.42 * alpha})`;
-  context.lineWidth = 1.4;
-  for (let i = 0; i < 8; i += 1) {
-    const angle = (Math.PI * 2 * i) / 8 + time * 0.06;
-    const inner = radius * 0.26;
-    const outer = radius * 0.52;
-    context.beginPath();
-    context.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
-    context.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
-    context.stroke();
+  // Inner warm glow
+  const innerGlow = ctx.createRadialGradient(x, y, 0, x, y, radius * 0.55);
+  innerGlow.addColorStop(0, `rgba(255,245,200,${0.4 * alpha * breathe})`);
+  innerGlow.addColorStop(0.5, `rgba(255,225,150,${0.2 * alpha})`);
+  innerGlow.addColorStop(1, "rgba(255,220,130,0)");
+  ctx.fillStyle = innerGlow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rotating sun rays
+  ctx.save();
+  const rayCount = 10;
+  for (let i = 0; i < rayCount; i++) {
+    const angle = (Math.PI * 2 * i) / rayCount + time * 0.04;
+    const inner = radius * 0.22;
+    const outer = radius * (0.45 + Math.sin(time * 0.5 + i * 1.3) * 0.08);
+    const rayAlpha = 0.18 + Math.sin(time * 0.7 + i * 0.9) * 0.06;
+
+    const grad = ctx.createLinearGradient(
+      x + Math.cos(angle) * inner, y + Math.sin(angle) * inner,
+      x + Math.cos(angle) * outer, y + Math.sin(angle) * outer
+    );
+    grad.addColorStop(0, `rgba(253,224,71,${rayAlpha * alpha})`);
+    grad.addColorStop(1, "rgba(253,224,71,0)");
+
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = radius * 0.04;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+    ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
+    ctx.stroke();
   }
-  context.restore();
+  ctx.restore();
 
-  context.fillStyle = `rgba(251,191,36,${0.8 * alpha})`;
-  context.beginPath();
-  context.arc(x, y, radius * 0.24, 0, Math.PI * 2);
-  context.fill();
+  // Sun core with highlight
+  const coreGrad = ctx.createRadialGradient(
+    x - radius * 0.04, y - radius * 0.04, 0,
+    x, y, radius * 0.2
+  );
+  coreGrad.addColorStop(0, `rgba(255,250,230,${0.9 * alpha})`);
+  coreGrad.addColorStop(0.5, `rgba(251,191,36,${0.85 * alpha})`);
+  coreGrad.addColorStop(1, `rgba(245,158,11,${0.6 * alpha})`);
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.2, 0, Math.PI * 2);
+  ctx.fill();
 
-  const particleCount = 8 + Math.round(cluster.intensity * 8);
-  context.fillStyle = `rgba(209,250,229,${0.45 * alpha})`;
-  for (let i = 0; i < particleCount; i += 1) {
-    const angle = (i / particleCount) * Math.PI * 2 + time * 0.18 + seed;
-    const distance = radius * (0.58 + ((i % 3) * 0.18));
-    const px = x + Math.cos(angle) * distance;
-    const py = y + Math.sin(angle) * distance + Math.sin(time + i) * 2;
-    context.beginPath();
-    context.arc(px, py, 1.6, 0, Math.PI * 2);
-    context.fill();
+  // Floating particles
+  const particles = getCalmPool(cluster.id);
+  for (const p of particles) {
+    const angle = p.angle + time * p.speed * 0.3;
+    const dist = p.dist * radius;
+    const floatY = Math.sin(time * p.speed + p.phase * 10) * radius * 0.04;
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist + floatY;
+
+    const pAlpha = (0.3 + Math.sin(time * 0.8 + p.phase * 6) * 0.15) * alpha;
+
+    ctx.fillStyle = `rgba(209,250,229,${pAlpha})`;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-function drawSparkle(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  context.beginPath();
-  context.moveTo(x, y - size);
-  context.lineTo(x + size * 0.3, y - size * 0.3);
-  context.lineTo(x + size, y);
-  context.lineTo(x + size * 0.3, y + size * 0.3);
-  context.lineTo(x, y + size);
-  context.lineTo(x - size * 0.3, y + size * 0.3);
-  context.lineTo(x - size, y);
-  context.lineTo(x - size * 0.3, y - size * 0.3);
-  context.closePath();
-  context.fill();
-}
-
+/* ══════════════════════════════════════════════════════════════════
+   HAPPINESS GLOW
+   ══════════════════════════════════════════════════════════════════ */
 function drawHappinessEvent(
-  context: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D,
   cluster: EmotionCluster,
   x: number,
   y: number,
@@ -246,35 +553,79 @@ function drawHappinessEvent(
   time: number
 ) {
   const seed = hash(cluster.id);
-  const pulse = 0.94 + Math.sin(time * 1.05 + seed * 9.2) * 0.11;
+  const pulse = 0.9 + Math.sin(time * 0.9 + seed * 9.2) * 0.1;
 
-  const glow = context.createRadialGradient(x, y, radius * 0.22, x, y, radius * 1.3);
-  glow.addColorStop(0, `rgba(251,191,36,${0.28 * alpha * pulse})`);
-  glow.addColorStop(1, "rgba(249,115,22,0)");
-  context.fillStyle = glow;
-  context.beginPath();
-  context.arc(x, y, radius * 1.3, 0, Math.PI * 2);
-  context.fill();
+  // Multi-layer warm golden glow
+  const outerGlow = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.5);
+  outerGlow.addColorStop(0, `rgba(255,200,50,${0.22 * alpha * pulse})`);
+  outerGlow.addColorStop(0.35, `rgba(255,170,30,${0.12 * alpha * pulse})`);
+  outerGlow.addColorStop(0.7, `rgba(249,115,22,${0.05 * alpha})`);
+  outerGlow.addColorStop(1, "rgba(249,115,22,0)");
+  ctx.fillStyle = outerGlow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+  ctx.fill();
 
-  context.fillStyle = `rgba(255,237,213,${0.78 * alpha})`;
-  context.beginPath();
-  context.arc(x, y, radius * 0.23, 0, Math.PI * 2);
-  context.fill();
+  // Inner warm core
+  const innerGlow = ctx.createRadialGradient(x, y, 0, x, y, radius * 0.45);
+  innerGlow.addColorStop(0, `rgba(255,250,240,${0.5 * alpha * pulse})`);
+  innerGlow.addColorStop(0.4, `rgba(255,230,180,${0.3 * alpha})`);
+  innerGlow.addColorStop(1, "rgba(255,200,100,0)");
+  ctx.fillStyle = innerGlow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.45, 0, Math.PI * 2);
+  ctx.fill();
 
-  const sparkleCount = 7 + Math.round(cluster.intensity * 10);
-  context.fillStyle = `rgba(253,224,71,${0.75 * alpha})`;
-  for (let i = 0; i < sparkleCount; i += 1) {
-    const angle = (i / sparkleCount) * Math.PI * 2 + time * 0.4 + seed * 3;
-    const drift = Math.sin(time * 1.2 + i + seed) * 4;
-    const distance = radius * (0.52 + (i % 4) * 0.15);
-    const px = x + Math.cos(angle) * distance;
-    const py = y + Math.sin(angle) * distance + drift;
-    drawSparkle(context, px, py, 2.2);
+  // Center orb
+  const orbGrad = ctx.createRadialGradient(
+    x - radius * 0.03, y - radius * 0.03, 0,
+    x, y, radius * 0.18
+  );
+  orbGrad.addColorStop(0, `rgba(255,255,245,${0.85 * alpha})`);
+  orbGrad.addColorStop(0.6, `rgba(255,237,213,${0.7 * alpha})`);
+  orbGrad.addColorStop(1, `rgba(251,191,36,${0.4 * alpha})`);
+  ctx.fillStyle = orbGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sparkle stars orbiting
+  const sparkles = getSparklePool(cluster.id, cluster.intensity);
+  for (const sp of sparkles) {
+    const angle = sp.angle + time * sp.speed * 0.5;
+    const dist = sp.dist * radius;
+    const floatY = Math.sin(time * sp.speed * 2 + sp.phase * 12) * radius * 0.05;
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist + floatY + sp.drift * Math.sin(time * 0.3);
+
+    const twinkle = 0.4 + Math.sin(time * 2.5 + sp.phase * 15) * 0.35;
+    const spAlpha = twinkle * alpha;
+
+    if (spAlpha < 0.05) continue;
+
+    drawSparkle(ctx, px, py, sp.size, spAlpha, "rgba(253,224,71,1)");
   }
+
+  // Tiny floating golden dots
+  ctx.save();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + time * 0.15 + seed * 3;
+    const dist = radius * (0.6 + Math.sin(time * 0.4 + i * 1.1) * 0.12);
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist + Math.sin(time * 0.8 + i) * 3;
+    const dotAlpha = (0.25 + Math.sin(time + i * 2) * 0.15) * alpha;
+
+    ctx.fillStyle = `rgba(255,237,180,${dotAlpha})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
+/* ── Event dispatcher ──────────────────────────────────────────── */
 function drawEvent(
-  context: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D,
   cluster: EmotionCluster,
   x: number,
   y: number,
@@ -284,36 +635,37 @@ function drawEvent(
 ) {
   switch (cluster.emotion) {
     case "anxiety":
-      drawAnxietyEvent(context, cluster, x, y, radius, alpha, time);
+      drawAnxietyEvent(ctx, cluster, x, y, radius, alpha, time);
       break;
     case "sadness":
-      drawSadnessEvent(context, cluster, x, y, radius, alpha, time);
+      drawSadnessEvent(ctx, cluster, x, y, radius, alpha, time);
       break;
     case "happiness":
-      drawHappinessEvent(context, cluster, x, y, radius, alpha, time);
+      drawHappinessEvent(ctx, cluster, x, y, radius, alpha, time);
       break;
     default:
-      drawCalmEvent(context, cluster, x, y, radius, alpha, time);
+      drawCalmEvent(ctx, cluster, x, y, radius, alpha, time);
       break;
   }
 }
 
+/* ── Hit-test for hover/click ──────────────────────────────────── */
 function findHoveredCluster(screenClusters: ScreenCluster[], point: mapboxgl.Point) {
   for (let i = screenClusters.length - 1; i >= 0; i -= 1) {
     const current = screenClusters[i];
-    if (current.alpha < 0.25) {
-      continue;
-    }
+    if (current.alpha < 0.25) continue;
     const dx = point.x - current.x;
     const dy = point.y - current.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance <= current.radiusPx * 0.82) {
+    if (Math.hypot(dx, dy) <= current.radiusPx * 0.82) {
       return current;
     }
   }
   return null;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ══════════════════════════════════════════════════════════════════ */
 export default function EmotionWeatherOverlay({
   map,
   checkins,
@@ -325,84 +677,87 @@ export default function EmotionWeatherOverlay({
   const animationRef = useRef<number | null>(null);
   const statesRef = useRef<Map<string, AnimatedCluster>>(new Map());
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const hoveredRef = useRef<ScreenCluster | null>(null);
 
   const clusters = useMemo(() => buildEmotionClusters(checkins), [checkins]);
 
   useEffect(() => {
     clustersRef.current = clusters;
+    // Clear stale particle pools when clusters change
+    const activeIds = new Set(clusters.map((c) => c.id));
+    for (const key of rainPools.keys()) {
+      if (!activeIds.has(key)) rainPools.delete(key);
+    }
+    for (const key of sparklePools.keys()) {
+      if (!activeIds.has(key)) sparklePools.delete(key);
+    }
+    for (const key of calmPools.keys()) {
+      if (!activeIds.has(key)) calmPools.delete(key);
+    }
   }, [clusters]);
 
+  /* ── Render loop ─────────────────────────────────────────────── */
   useEffect(() => {
-    if (!map || !canvasRef.current) {
-      return;
-    }
+    if (!map || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d", { alpha: true });
-    if (!context) {
-      return;
-    }
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
 
     const syncCanvasSize = () => {
       const container = map.getContainer();
-      const width = container.clientWidth;
-      const height = container.clientHeight;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-      if (
-        canvas.width !== Math.round(width * dpr) ||
-        canvas.height !== Math.round(height * dpr)
-      ) {
-        canvas.width = Math.round(width * dpr);
-        canvas.height = Math.round(height * dpr);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
       }
-
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     const render = () => {
       syncCanvasSize();
 
-      const width = map.getContainer().clientWidth;
-      const height = map.getContainer().clientHeight;
+      const w = map.getContainer().clientWidth;
+      const h = map.getContainer().clientHeight;
       const zoom = map.getZoom();
       const now = performance.now() / 1000;
-      const visibleBounds = map.getBounds();
+      const bounds = map.getBounds();
 
-      context.clearRect(0, 0, width, height);
+      ctx.clearRect(0, 0, w, h);
       screenClustersRef.current = [];
 
       const states = statesRef.current;
+
+      // Mark all as fading out
       for (const state of states.values()) {
         state.targetAlpha = 0;
       }
 
-      if (zoom >= minZoom && visibleBounds) {
-        const visibleClusters = clustersRef.current
-          .filter((cluster) => visibleBounds.contains(cluster.coordinates))
+      if (zoom >= minZoom && bounds) {
+        const visible = clustersRef.current
+          .filter((c) => bounds.contains(c.coordinates))
           .slice(0, MAX_RENDERED);
 
-        for (const cluster of visibleClusters) {
+        for (const cluster of visible) {
           const projected = map.project(cluster.coordinates);
 
           if (
-            projected.x < -160 ||
-            projected.y < -160 ||
-            projected.x > width + 160 ||
-            projected.y > height + 160
-          ) {
-            continue;
-          }
+            projected.x < -180 || projected.y < -180 ||
+            projected.x > w + 180 || projected.y > h + 180
+          ) continue;
 
           const mpp = metersPerPixel(cluster.coordinates[1], zoom);
           const baseRadius = cluster.radiusMeters / Math.max(1, mpp);
-          const radiusPx = Math.max(28, Math.min(130, baseRadius));
+          const radiusPx = Math.max(32, Math.min(150, baseRadius));
 
           const seed = hash(cluster.id);
-          const driftX = Math.sin(now * 0.35 + seed * 9.5) * radiusPx * 0.05;
-          const driftY = Math.cos(now * 0.28 + seed * 11.2) * radiusPx * 0.03;
+          const driftX = Math.sin(now * 0.3 + seed * 9.5) * radiusPx * 0.04;
+          const driftY = Math.cos(now * 0.22 + seed * 11.2) * radiusPx * 0.025;
 
           const current = states.get(cluster.id) ?? {
             cluster,
@@ -422,23 +777,42 @@ export default function EmotionWeatherOverlay({
         }
       }
 
-      for (const [id, state] of states.entries()) {
-        state.alpha += (state.targetAlpha - state.alpha) * 0.085;
+      // Animate alpha & draw
+      const hoveredId = hoveredRef.current?.cluster.id ?? null;
 
-        if (state.alpha < 0.012 && state.targetAlpha < 0.02) {
+      // When hovering, draw non-hovered first (dimmed), then hovered on top
+      const sortedEntries = Array.from(states.entries());
+      if (hoveredId) {
+        sortedEntries.sort((a, b) => {
+          if (a[0] === hoveredId) return 1;  // hovered drawn last (on top)
+          if (b[0] === hoveredId) return -1;
+          return 0;
+        });
+      }
+
+      for (const [id, state] of sortedEntries) {
+        state.alpha += (state.targetAlpha - state.alpha) * 0.07;
+
+        if (state.alpha < 0.01 && state.targetAlpha < 0.02) {
           states.delete(id);
           continue;
         }
 
-        drawEvent(
-          context,
-          state.cluster,
-          state.x,
-          state.y,
-          state.radiusPx,
-          state.alpha,
-          now
-        );
+        // Dim non-hovered clusters when something is hovered
+        let drawAlpha = state.alpha;
+        let drawRadius = state.radiusPx;
+        if (hoveredId) {
+          if (id === hoveredId) {
+            // Boost hovered: slightly larger + full alpha
+            drawAlpha = Math.min(1, state.alpha * 1.15);
+            drawRadius = state.radiusPx * 1.12;
+          } else {
+            // Dim others significantly
+            drawAlpha = state.alpha * 0.18;
+          }
+        }
+
+        drawEvent(ctx, state.cluster, state.x, state.y, drawRadius, drawAlpha, now);
 
         screenClustersRef.current.push({
           cluster: state.cluster,
@@ -454,10 +828,7 @@ export default function EmotionWeatherOverlay({
 
     animationRef.current = requestAnimationFrame(render);
 
-    const handleResize = () => {
-      syncCanvasSize();
-    };
-
+    const handleResize = () => syncCanvasSize();
     map.on("resize", handleResize);
 
     return () => {
@@ -474,66 +845,118 @@ export default function EmotionWeatherOverlay({
     };
   }, [map, minZoom]);
 
+  /* ── Hover + Click interaction ───────────────────────────────── */
   useEffect(() => {
-    if (!map) {
-      return;
-    }
+    if (!map) return;
 
     const handleMove = (event: mapboxgl.MapMouseEvent) => {
       const hovered = findHoveredCluster(screenClustersRef.current, event.point);
+      hoveredRef.current = hovered;
       map.getCanvas().style.cursor = hovered ? "pointer" : "";
+
+      // Show hover tooltip
+      if (hovered) {
+        const peakLabel = `${String(hovered.cluster.peakHour).padStart(2, "0")}:00`;
+        const trendColor =
+          hovered.cluster.trend === "Rising" ? "#f87171" :
+          hovered.cluster.trend === "Cooling" ? "#34d399" : "#94a3b8";
+        const trendIcon =
+          hovered.cluster.trend === "Rising" ? "&#8599;" :
+          hovered.cluster.trend === "Cooling" ? "&#8600;" : "&#8594;";
+
+        const emotionIcon =
+          hovered.cluster.emotion === "anxiety" ? "⛈" :
+          hovered.cluster.emotion === "sadness" ? "🌧" :
+          hovered.cluster.emotion === "happiness" ? "☀️" : "🌤";
+
+        if (!popupRef.current) {
+          popupRef.current = new mapboxgl.Popup({
+            className: "emotion-weather-popup",
+            offset: 18,
+            maxWidth: "280px",
+            closeButton: false,
+            closeOnClick: false,
+          });
+        }
+
+        popupRef.current
+          .setLngLat(hovered.cluster.coordinates)
+          .setHTML(
+            `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#e2e8f0;min-width:220px;line-height:1.5;padding:4px 0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                <span style="font-size:20px">${emotionIcon}</span>
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:#f8fafc;letter-spacing:-0.2px">${weatherTitle(hovered.cluster.emotion)}</div>
+                  <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Emotional Weather</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid rgba(100,116,139,0.2)">
+                <div style="display:flex;justify-content:space-between">
+                  <span style="color:#94a3b8">Nearby check-ins</span>
+                  <strong style="color:#f8fafc">${hovered.cluster.count}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="color:#94a3b8">Peak time</span>
+                  <strong style="color:#f8fafc">${peakLabel}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="color:#94a3b8">Trend</span>
+                  <strong style="color:${trendColor}">${trendIcon} ${hovered.cluster.trend}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="color:#94a3b8">Intensity</span>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:48px;height:4px;border-radius:2px;background:rgba(100,116,139,0.3);overflow:hidden">
+                      <div style="width:${Math.round(hovered.cluster.intensity * 100)}%;height:100%;border-radius:2px;background:linear-gradient(90deg,#6366f1,#a78bfa)"></div>
+                    </div>
+                    <strong style="color:#f8fafc;font-size:11px">${Math.round(hovered.cluster.intensity * 100)}%</strong>
+                  </div>
+                </div>
+              </div>
+            </div>`
+          )
+          .addTo(map);
+      } else {
+        popupRef.current?.remove();
+        popupRef.current = null;
+      }
     };
 
     const handleLeave = () => {
       map.getCanvas().style.cursor = "";
-    };
-
-    const handleClick = (event: mapboxgl.MapMouseEvent) => {
-      const hovered = findHoveredCluster(screenClustersRef.current, event.point);
-      if (!hovered) {
-        return;
-      }
-
+      hoveredRef.current = null;
       popupRef.current?.remove();
-
-      const peakHourLabel = `${String(hovered.cluster.peakHour).padStart(2, "0")}:00`;
-
-      popupRef.current = new mapboxgl.Popup({
-        className: "dark-popup",
-        offset: 16,
-        maxWidth: "260px",
-      })
-        .setLngLat(hovered.cluster.coordinates)
-        .setHTML(
-          `<div style="font-size:12px;color:#e2e8f0;min-width:220px;line-height:1.45">
-            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8">${weatherTitle(hovered.cluster.emotion)}</div>
-            <div style="margin-top:8px;display:flex;justify-content:space-between;gap:12px">
-              <span style="color:#94a3b8">Nearby check-ins</span>
-              <strong style="color:#f8fafc">${hovered.cluster.count}</strong>
-            </div>
-            <div style="margin-top:4px;display:flex;justify-content:space-between;gap:12px">
-              <span style="color:#94a3b8">Peak time</span>
-              <strong style="color:#f8fafc">${peakHourLabel}</strong>
-            </div>
-            <div style="margin-top:4px;display:flex;justify-content:space-between;gap:12px">
-              <span style="color:#94a3b8">Trend</span>
-              <strong style="color:#f8fafc">${hovered.cluster.trend}</strong>
-            </div>
-          </div>`
-        )
-        .addTo(map);
+      popupRef.current = null;
     };
 
     map.on("mousemove", handleMove);
     map.on("mouseleave", handleLeave);
-    map.on("click", handleClick);
 
     return () => {
       map.off("mousemove", handleMove);
       map.off("mouseleave", handleLeave);
-      map.off("click", handleClick);
     };
   }, [map]);
 
-  return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-[32]" />;
+  return (
+    <>
+      <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-[32]" />
+      <style jsx global>{`
+        .emotion-weather-popup .mapboxgl-popup-content {
+          background: rgba(15, 23, 42, 0.95) !important;
+          backdrop-filter: blur(16px) saturate(1.8) !important;
+          -webkit-backdrop-filter: blur(16px) saturate(1.8) !important;
+          border: 1px solid rgba(100, 116, 139, 0.2) !important;
+          border-radius: 14px !important;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.04) inset !important;
+          padding: 14px 16px !important;
+          color: white !important;
+        }
+        .emotion-weather-popup .mapboxgl-popup-tip {
+          border-top-color: rgba(15, 23, 42, 0.95) !important;
+          border-bottom-color: rgba(15, 23, 42, 0.95) !important;
+        }
+      `}</style>
+    </>
+  );
 }

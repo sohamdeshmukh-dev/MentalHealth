@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import ProfileSafetyPanel from "@/components/ProfileSafetyPanel";
 import CampusDashboard from "@/components/CampusDashboard";
+import CollegePicker from "@/components/CollegePicker";
 import { useTheme } from "@/hooks/useTheme";
 import { CampusEmotionResponse, College } from "@/lib/types";
 
@@ -301,6 +302,34 @@ export default function ProfilePage() {
         }
     };
 
+    async function handleCollegeSave(collegeId: string | null, city: string, major: string | null, grade: string | null) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const updates: Record<string, unknown> = { college_id: collegeId, city, major: major ?? null, grade: grade ?? null };
+
+        const { error } = await supabase
+            .from("profiles")
+            .update(updates)
+            .eq("id", user.id);
+
+        if (error) throw error;
+
+        setProfile((prev: any) => ({ ...prev, ...updates }));
+
+        if (collegeId) {
+            const { data: selectedCollege } = await supabase
+                .from("colleges")
+                .select("id, name, city, latitude, longitude, campus_radius")
+                .eq("id", collegeId)
+                .single();
+            setCollege((selectedCollege as College) ?? null);
+        } else {
+            setCollege(null);
+            setCampusInsights(null);
+        }
+    }
+
     async function handleLogout() {
         await supabase.auth.signOut();
         window.location.href = "/login";
@@ -450,6 +479,14 @@ export default function ProfilePage() {
                     onDeleteContact={handleDeleteContact}
                     onExportData={handleExportData}
                     onDeleteAllJournal={handleDeleteAllJournal}
+                />
+
+                <CollegePicker
+                    currentCollege={college}
+                    currentCity={profile?.city ?? null}
+                    currentMajor={profile?.major ?? null}
+                    currentGrade={profile?.grade ?? null}
+                    onSave={handleCollegeSave}
                 />
 
                 <CampusDashboard

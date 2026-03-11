@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { CampusEmotionResponse, College } from "@/lib/types";
 import { getEmotionalBalanceScore, normalizeEmotion } from "@/lib/journal";
+import CollegeLogo from "./CollegeLogo";
 
 interface JournalEntryRow {
   mood?: string | null;
@@ -164,7 +165,8 @@ export default function CampusDashboard({ college, campusInsights, journalEntrie
             Anonymous campus-level trends with identity-safe aggregation.
           </p>
         </div>
-        <div className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
+        <div className="flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
+          <CollegeLogo collegeName={college.name} size={18} />
           {college.name}
         </div>
       </div>
@@ -172,8 +174,13 @@ export default function CampusDashboard({ college, campusInsights, journalEntrie
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
           <p className="text-[10px] uppercase tracking-wide text-slate-500">Campus Overview</p>
-          <p className="mt-2 text-sm font-semibold text-slate-200">{college.name}</p>
-          <p className="mt-1 text-xs text-slate-400">{college.city}</p>
+          <div className="mt-2 flex items-center gap-2.5">
+            <CollegeLogo collegeName={college.name} size={32} />
+            <div>
+              <p className="text-sm font-semibold text-slate-200">{college.name}</p>
+              <p className="text-xs text-slate-400">{college.city}</p>
+            </div>
+          </div>
         </div>
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
           <p className="text-[10px] uppercase tracking-wide text-slate-500">Students on Platform</p>

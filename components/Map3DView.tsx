@@ -11,7 +11,7 @@ import {
   MOODS,
   Mood,
 } from "@/lib/types";
-import { buildSkylineGeoJSON, buildPointGeoJSON } from "@/lib/gridAggregator";
+import { buildPointGeoJSON } from "@/lib/gridAggregator";
 import { buildCityMask } from "@/lib/cityMask";
 import ResourceMarkers from "./ResourceMarkers";
 import CampusLayer from "./CampusLayer";
@@ -24,9 +24,6 @@ import { seedRealSafeSpaces } from "@/utils/seedSafeSpaces";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-const MOODS_BY_STRESS = [...MOODS].sort((a, b) => a.weight - b.weight);
-
-const SKYLINE_COLOR_STOPS = MOODS_BY_STRESS.flatMap((m) => [m.weight, m.color]);
 const CIRCLE_COLOR_STOPS = MOODS.flatMap((m) => [m.label, m.color]);
 
 interface Map3DViewProps {
@@ -61,10 +58,6 @@ export default function Map3DView({
   const [isSeedingSpaces, setIsSeedingSpaces] = useState(false);
 
   // Memoised builders
-  const skylineData = useCallback(
-    (d: CheckIn[]) => buildSkylineGeoJSON(d),
-    []
-  );
   const pointData = useCallback(
     (d: CheckIn[]) => {
       if (!Array.isArray(d) || d.length === 0) {
@@ -182,35 +175,6 @@ export default function Map3DView({
         data: pointData(checkins),
       });
 
-      // ── Skyline source (polygon grid cells) ─────────────────
-      map.addSource("mood-skyline", {
-        type: "geojson",
-        data: skylineData(checkins),
-      });
-
-
-
-      // ── Skyline extrusions (polygon grid → 3D columns) ──────
-      map.addLayer(
-        {
-          id: "skyline-extrusions",
-          type: "fill-extrusion",
-          source: "mood-skyline",
-          paint: {
-            "fill-extrusion-color": [
-              "interpolate",
-              ["linear"],
-              ["get", "weight"],
-              ...SKYLINE_COLOR_STOPS,
-            ],
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": 0,
-            "fill-extrusion-opacity": 0.78,
-          },
-        },
-        labelLayerId
-      );
-
       // ── Circle detail at high zoom ───────────────────────────
       map.addLayer({
         id: "mood-circles",
@@ -231,25 +195,6 @@ export default function Map3DView({
       });
 
       // ── Popups ───────────────────────────────────────────────
-      map.on("click", "skyline-extrusions", (e) => {
-        const f = e.features?.[0];
-        if (!f) return;
-        const { mood, count, weight } = f.properties as {
-          mood: string; count: number; weight: number;
-        };
-        const icon = MOODS.find((m) => m.label === mood)?.icon ?? "";
-        const stressLevel = Math.round(weight * 100);
-        new mapboxgl.Popup({ className: "dark-popup", offset: 12 })
-          .setLngLat(e.lngLat)
-          .setHTML(
-            `<div style="font-size:13px;color:#f1f5f9">
-              <strong>${icon} ${mood}</strong>
-              <p style="margin:4px 0 0;color:#94a3b8">${count} report${count > 1 ? "s" : ""} &middot; ${stressLevel}% stress</p>
-            </div>`
-          )
-          .addTo(map);
-      });
-
       map.on("click", "mood-circles", (e) => {
         const f = e.features?.[0];
         if (!f || f.geometry.type !== "Point") return;
@@ -270,7 +215,7 @@ export default function Map3DView({
           .addTo(map);
       });
 
-      for (const layerId of ["skyline-extrusions", "mood-circles"]) {
+      for (const layerId of ["mood-circles"]) {
         map.on("mouseenter", layerId, () => {
           map.getCanvas().style.cursor = "pointer";
         });
@@ -378,10 +323,7 @@ export default function Map3DView({
 
     const ptSrc = map.getSource("mood-points") as mapboxgl.GeoJSONSource | undefined;
     if (ptSrc) ptSrc.setData(pointData(checkins));
-
-    const skySrc = map.getSource("mood-skyline") as mapboxgl.GeoJSONSource | undefined;
-    if (skySrc) skySrc.setData(skylineData(checkins));
-  }, [checkins, pointData, skylineData]);
+  }, [checkins, pointData]);
 
   // ── 3D Emotional Weather: Native Mapbox Rain/Snow/Fog (ADDITIVE / ISOLATED) ──
   useEffect(() => {
