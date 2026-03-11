@@ -178,6 +178,23 @@ export function useMoodEntry() {
         const mapped = mapJournalEntryFromDb(inserted);
         setEntries((current) => [mapped, ...current]);
 
+        // 1. Increment Logic: Update the profile counter
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('total_journals')
+            .eq('id', user.id)
+            .single();
+
+          const currentTotal = profileData?.total_journals || 0;
+          await supabase
+            .from('profiles')
+            .update({ total_journals: currentTotal + 1 })
+            .eq('id', user.id);
+        } catch (err) {
+          console.error("Failed to increment journal counter:", err);
+        }
+
         setSaveSuccess(true);
         if (successTimer.current) {
           clearTimeout(successTimer.current);

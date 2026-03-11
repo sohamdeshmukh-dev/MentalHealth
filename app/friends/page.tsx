@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Leaderboard from "@/components/Leaderboard";
 import { createBrowserClient } from "@supabase/ssr";
+import { BookOpen } from "lucide-react";
 import FloatingChat from "@/components/FloatingChat";
 
 type Tab = "friends" | "leaderboard";
@@ -111,8 +112,8 @@ export default function FriendsPage() {
                 .select(`
                     id,
                     status,
-                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code),
-                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code)
+                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code, total_journals),
+                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code, total_journals)
                 `)
                 .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                 .eq('status', 'accepted');
@@ -124,8 +125,8 @@ export default function FriendsPage() {
                     .select(`
                         id,
                         status,
-                        sender:user_id (id, display_name, avatar_url, unique_code),
-                        receiver:friend_id (id, display_name, avatar_url, unique_code)
+                        sender:user_id (id, display_name, avatar_url, unique_code, total_journals),
+                        receiver:friend_id (id, display_name, avatar_url, unique_code, total_journals)
                     `)
                     .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                     .eq('status', 'accepted');
@@ -138,7 +139,7 @@ export default function FriendsPage() {
                             id: row.id,
                             friend_id: friendProfile.id,
                             profile: friendProfile,
-                            entry_count: 0
+                            entry_count: friendProfile.total_journals || 0
                         };
                     });
                     setAcceptedFriends(formattedFriends);
@@ -151,7 +152,7 @@ export default function FriendsPage() {
                         id: row.id,
                         friend_id: friendProfile.id,
                         profile: friendProfile,
-                        entry_count: 0
+                        entry_count: friendProfile.total_journals || 0
                     };
                 });
                 setAcceptedFriends(formattedFriends);
@@ -171,6 +172,47 @@ export default function FriendsPage() {
             fetchFriends();
         }
     }, [currentUser, fetchRequests, fetchFriends]);
+
+    // 3. The Real-time Sync
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const profileSubscription = supabase
+            .channel('profile-updates')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles'
+                },
+                (payload: any) => {
+                    const updatedProfile = payload.new;
+                    setAcceptedFriends((prev) =>
+                        prev.map((friend) => {
+                            if (friend.friend_id === updatedProfile.id) {
+                                return {
+                                    ...friend,
+                                    profile: { ...friend.profile, ...updatedProfile },
+                                    entry_count: updatedProfile.total_journals || 0
+                                };
+                            }
+                            return friend;
+                        })
+                    );
+
+                    if (updatedProfile.id === currentUser.id) {
+                        setMyEntryCount(updatedProfile.total_journals || 0);
+                        setMyProfile(updatedProfile);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profileSubscription);
+        };
+    }, [currentUser, supabase]);
 
     async function handleAddFriend(e: React.FormEvent) {
         e.preventDefault();
@@ -300,23 +342,7 @@ export default function FriendsPage() {
         }
     }
 
-    // Build leaderboard entries
-    const leaderboardEntries = acceptedFriends.map((f) => ({
-        id: f.friend_id,
-        display_name: f.profile?.display_name,
-        unique_code: f.profile?.unique_code || "—",
-        avatar_url: f.profile?.avatar_url,
-        entry_count: f.entry_count,
-        isCurrentUser: false,
-    }));
-    leaderboardEntries.push({
-        id: currentUser?.id || "me",
-        display_name: myProfile?.display_name,
-        unique_code: myProfile?.unique_code || "—",
-        avatar_url: myProfile?.avatar_url,
-        entry_count: myEntryCount,
-        isCurrentUser: true,
-    });
+    // Leaderboard now fetches its own entries
 
     return (
         <div className="min-h-screen bg-[#050913] page-enter">
@@ -616,8 +642,9 @@ export default function FriendsPage() {
                                                     {friend.profile?.display_name && (
                                                         <p className="text-[11px] text-slate-400">#{friend.profile?.unique_code}</p>
                                                     )}
-                                                    <div className="text-[11px] text-slate-400">
-                                                        {friend.entry_count} journal entries
+                                                    <div className="text-[11px] flex items-center gap-1 text-emerald-400/80 font-medium">
+                                                        <BookOpen className="w-3 h-3" />
+                                                        {friend.entry_count} entries
                                                     </div>
                                                 </div>
                                             </div>
@@ -635,7 +662,7 @@ export default function FriendsPage() {
                         </div>
                     </div>
                 ) : (
-                    <Leaderboard entries={leaderboardEntries} />
+                    <Leaderboard />
                 )}
             </div>
             <FloatingChat />

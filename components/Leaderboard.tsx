@@ -1,29 +1,100 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+
 interface LeaderboardEntry {
     id: string;
     display_name?: string;
     unique_code: string;
     avatar_url?: string;
-    entry_count: number;
+    total_journals: number;
     isCurrentUser?: boolean;
-}
-
-interface LeaderboardProps {
-    entries: LeaderboardEntry[];
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export default function Leaderboard({ entries }: LeaderboardProps) {
-    const sorted = [...entries].sort((a, b) => b.entry_count - a.entry_count);
+export default function Leaderboard() {
+    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [userId, setUserId] = useState<string | null>(null);
 
-    if (sorted.length === 0) {
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const fetchLeaderboard = useCallback(async (currentUserId: string | null) => {
+        setIsLoading(true);
+        try {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, display_name, unique_code, avatar_url, total_journals')
+                .order('total_journals', { ascending: false })
+                .limit(10);
+
+            if (data) {
+                setEntries(data.map(profile => ({
+                    ...profile,
+                    total_journals: profile.total_journals || 0,
+                    isCurrentUser: currentUserId ? profile.id === currentUserId : false
+                })));
+            }
+        } catch (err) {
+            console.error("Failed to fetch leaderboard", err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [supabase]);
+
+    useEffect(() => {
+        let currentUserId: string | null = null;
+
+        async function init() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                currentUserId = user.id;
+                setUserId(user.id);
+            }
+            await fetchLeaderboard(currentUserId);
+        }
+        init();
+
+        const profileSubscription = supabase
+            .channel('leaderboard-updates')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles'
+                },
+                () => {
+                    // Refetch totally on update so the order shifts correctly
+                    fetchLeaderboard(currentUserId);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profileSubscription);
+        };
+    }, [supabase, fetchLeaderboard]);
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center py-16">
+                <div className="h-8 w-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (entries.length === 0) {
         return (
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
                 <div className="text-3xl mb-2">🏆</div>
                 <p className="text-slate-400 text-sm">
-                    Add friends to see the leaderboard!
+                    No users found!
                 </p>
             </div>
         );
@@ -31,7 +102,7 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
 
     return (
         <div className="space-y-2">
-            {sorted.map((entry, index) => (
+            {entries.map((entry, index) => (
                 <div
                     key={entry.id}
                     className={`flex items-center gap-4 rounded-2xl border p-4 transition-colors ${entry.isCurrentUser
@@ -40,7 +111,7 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                         }`}
                 >
                     {/* Rank */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 text-lg font-bold">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 text-lg font-bold shadow-inner">
                         {index < 3 ? MEDALS[index] : (
                             <span className="text-sm text-slate-400">{index + 1}</span>
                         )}
@@ -59,7 +130,7 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                     <div className="flex-1 min-w-0">
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-white">
+                                <p className="text-sm font-semibold text-white truncate">
                                     {entry.isCurrentUser
                                         ? 'You'
                                         : (entry.display_name || entry.unique_code)}
@@ -70,17 +141,16 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                                     </span>
                                 )}
                             </div>
-                            {/* Only show the unique code as a subtitle if they have a display name OR if it's 'You' */}
                             {(entry.display_name || entry.isCurrentUser) && (
-                                <p className="text-[11px] text-slate-400">#{entry.unique_code}</p>
+                                <p className="text-[11px] text-slate-400 truncate">#{entry.unique_code}</p>
                             )}
                         </div>
                     </div>
 
                     {/* Stats */}
                     <div className="text-right shrink-0">
-                        <div className="text-lg font-bold text-white">{entry.entry_count}</div>
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">entries</div>
+                        <div className="text-lg font-bold text-white">{entry.total_journals}</div>
+                        <div className="text-[10px] text-emerald-400/80 uppercase tracking-wider font-semibold">Journals</div>
                     </div>
                 </div>
             ))}

@@ -143,6 +143,21 @@ export default function LivingBook() {
                         (voiceFn as (t: string) => void)(transcript);
                     }
                 }
+
+                // Increment profile counter
+                try {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('total_journals')
+                        .eq('id', userId)
+                        .single();
+                    await supabase
+                        .from('profiles')
+                        .update({ total_journals: (profile?.total_journals || 0) + 1 })
+                        .eq('id', userId);
+                } catch (err) {
+                    console.error("Failed to increment counter:", err);
+                }
             } catch (err) {
                 console.error("Failed to save recording:", err);
             } finally {
