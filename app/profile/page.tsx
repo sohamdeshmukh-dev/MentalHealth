@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import ProfileSafetyPanel from "@/components/ProfileSafetyPanel";
+import CampusDashboard from "@/components/CampusDashboard";
 import { useTheme } from "@/hooks/useTheme";
+import { CampusEmotionResponse, College } from "@/lib/types";
 
 const AVATARS = [
     "https://api.dicebear.com/7.x/shapes/svg?seed=Felix",
@@ -25,6 +27,9 @@ export default function ProfilePage() {
     const [profile, setProfile] = useState<any>(null);
     const [contacts, setContacts] = useState<any[]>([]);
     const [journalEntries, setJournalEntries] = useState<any[]>([]);
+    const [college, setCollege] = useState<College | null>(null);
+    const [campusInsights, setCampusInsights] = useState<CampusEmotionResponse | null>(null);
+    const [isCampusLoading, setIsCampusLoading] = useState(false);
     const [counts, setCounts] = useState({ checkins: 0, journals: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [showAvatars, setShowAvatars] = useState(false);
@@ -65,9 +70,20 @@ export default function ProfilePage() {
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
+            let collegeData: College | null = null;
+            if (profileData?.college_id) {
+                const { data: selectedCollege } = await supabase
+                    .from('colleges')
+                    .select('id, name, city, latitude, longitude, campus_radius')
+                    .eq('id', profileData.college_id)
+                    .single();
+                collegeData = (selectedCollege as College) ?? null;
+            }
+
             setProfile(profileData);
             setContacts(contactsData || []);
             setJournalEntries(journalData || []);
+            setCollege(collegeData);
             setCounts({
                 checkins: checkinRes.count || 0,
                 journals: journalRes.count || 0
@@ -84,6 +100,43 @@ export default function ProfilePage() {
     useEffect(() => {
         fetchProfileData();
     }, [fetchProfileData]);
+
+    useEffect(() => {
+        if (!college?.id) {
+            setCampusInsights(null);
+            return;
+        }
+
+        let isMounted = true;
+        setIsCampusLoading(true);
+
+        fetch(`/api/campus/${encodeURIComponent(college.id)}/emotions`)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error("Unable to load campus insights.");
+                }
+                const payload = await response.json();
+                if (!isMounted) {
+                    return;
+                }
+                setCampusInsights(payload as CampusEmotionResponse);
+            })
+            .catch((error) => {
+                console.error(error);
+                if (isMounted) {
+                    setCampusInsights(null);
+                }
+            })
+            .finally(() => {
+                if (isMounted) {
+                    setIsCampusLoading(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [college?.id]);
 
     async function handleUpdateProfile(updates: Record<string, any>) {
         try {
@@ -397,6 +450,13 @@ export default function ProfilePage() {
                     onDeleteContact={handleDeleteContact}
                     onExportData={handleExportData}
                     onDeleteAllJournal={handleDeleteAllJournal}
+                />
+
+                <CampusDashboard
+                    college={college}
+                    campusInsights={campusInsights}
+                    journalEntries={journalEntries}
+                    loading={isCampusLoading}
                 />
 
                 <div className="mt-6">

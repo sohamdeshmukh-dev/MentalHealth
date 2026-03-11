@@ -3,11 +3,19 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { CheckIn, MOODS, CityConfig, Mood } from "@/lib/types";
+import {
+  CampusEmotionResponse,
+  CheckIn,
+  CityConfig,
+  College,
+  MOODS,
+  Mood,
+} from "@/lib/types";
 import { buildSkylineGeoJSON, buildPointGeoJSON } from "@/lib/gridAggregator";
 import { buildCityMask } from "@/lib/cityMask";
-import MoodHeatmap from "./MoodHeatmap";
 import ResourceMarkers from "./ResourceMarkers";
+import CampusLayer from "./CampusLayer";
+import EmotionWeatherOverlay from "./EmotionWeatherOverlay";
 import { getResourcesByCity } from "@/lib/store";
 import { CAMPUSES } from "@/lib/campusDetection";
 import { supabase } from "@/lib/supabase";
@@ -18,29 +26,6 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 const MOODS_BY_STRESS = [...MOODS].sort((a, b) => a.weight - b.weight);
 
-const HEATMAP_ALPHA: Record<Mood, number> = {
-  Calm: 0.35,
-  Happy: 0.4,
-  Neutral: 0.45,
-  Sad: 0.55,
-  Overwhelmed: 0.65,
-  Stressed: 0.78,
-};
-
-function hexToRgba(hex: string, alpha: number) {
-  const sanitized = hex.replace("#", "");
-  if (sanitized.length !== 6) return `rgba(148,163,184,${alpha})`;
-  const r = Number.parseInt(sanitized.slice(0, 2), 16);
-  const g = Number.parseInt(sanitized.slice(2, 4), 16);
-  const b = Number.parseInt(sanitized.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-const HEATMAP_COLOR_STOPS = MOODS_BY_STRESS.flatMap((m) => [
-  m.weight,
-  hexToRgba(m.color, HEATMAP_ALPHA[m.label]),
-]);
-
 const SKYLINE_COLOR_STOPS = MOODS_BY_STRESS.flatMap((m) => [m.weight, m.color]);
 const CIRCLE_COLOR_STOPS = MOODS.flatMap((m) => [m.label, m.color]);
 
@@ -49,9 +34,22 @@ interface Map3DViewProps {
   city: CityConfig;
   focusedCampus?: string;
   selectedMood?: Mood | null;
+  campuses?: College[];
+  registeredCollege?: College | null;
+  campusInsights?: CampusEmotionResponse | null;
+  focusRegisteredCampus?: boolean;
 }
 
-export default function Map3DView({ checkins, city, focusedCampus, selectedMood }: Map3DViewProps) {
+export default function Map3DView({
+  checkins,
+  city,
+  focusedCampus,
+  selectedMood,
+  campuses = [],
+  registeredCollege = null,
+  campusInsights = null,
+  focusRegisteredCampus = false,
+}: Map3DViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
@@ -305,7 +303,45 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
     // Stop any active rotation/animation immediately
     map.stop();
 
+    const maskSrc = map.getSource("city-mask") as mapboxgl.GeoJSONSource | undefined;
+    if (maskSrc) {
+      maskSrc.setData(buildCityMask(city));
+    }
+
+    if (
+      focusRegisteredCampus &&
+      registeredCollege &&
+      registeredCollege.city === city.name
+    ) {
+      setTimeout(() => {
+        map.flyTo({
+          center: [registeredCollege.longitude, registeredCollege.latitude],
+          zoom: 15,
+          pitch: 70,
+          bearing: 0,
+          duration: 2200,
+          essential: true,
+        });
+      }, 50);
+      return;
+    }
+
     if (focusedCampus) {
+      const collegeMatch = campuses.find((campus) => campus.name === focusedCampus);
+      if (collegeMatch) {
+        setTimeout(() => {
+          map.flyTo({
+            center: [collegeMatch.longitude, collegeMatch.latitude],
+            zoom: 15,
+            pitch: 70,
+            bearing: 0,
+            duration: 2200,
+            essential: true,
+          });
+        }, 50);
+        return;
+      }
+
       const campus = CAMPUSES.find((c) => c.name === focusedCampus);
       if (campus) {
         setTimeout(() => {
@@ -332,10 +368,7 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
         essential: true,
       });
     }, 50);
-
-    const maskSrc = map.getSource("city-mask") as mapboxgl.GeoJSONSource | undefined;
-    if (maskSrc) maskSrc.setData(buildCityMask(city));
-  }, [city, focusedCampus]);
+  }, [campuses, city, focusRegisteredCampus, focusedCampus, registeredCollege]);
 
   // ── Update mood data (both sources) ──────────────────────────
   useEffect(() => {
@@ -673,8 +706,14 @@ export default function Map3DView({ checkins, city, focusedCampus, selectedMood 
   return (
     <>
       <div ref={containerRef} className="h-full w-full" />
-      <MoodHeatmap map={mapInstance} checkins={checkins} selectedCity={city.name} />
+      <EmotionWeatherOverlay map={mapInstance} checkins={checkins} />
       <ResourceMarkers map={mapInstance} resources={getResourcesByCity(city.name)} />
+      <CampusLayer
+        map={mapInstance}
+        campuses={campuses}
+        registeredCollege={registeredCollege}
+        campusInsights={campusInsights}
+      />
 
       {/* Safe Space Modal — shown on right-click */}
       {draftSafeSpace && (

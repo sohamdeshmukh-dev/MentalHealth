@@ -10,6 +10,59 @@ export interface CheckIn {
   city: string;
   hugs?: number;
   campus_name?: string;
+  user_id?: string | null;
+  college_id?: string | null;
+}
+
+export interface College {
+  id: string;
+  name: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  campus_radius: number;
+}
+
+export interface CampusEmotionDistributionItem {
+  emotion: Mood;
+  count: number;
+  share: number;
+}
+
+export interface CampusTrendPoint {
+  date: string;
+  average_score: number;
+  checkin_count: number;
+}
+
+export interface CampusWindowTrend {
+  average_score: number;
+  checkin_count: number;
+}
+
+export interface CampusEmotionResponse {
+  college_id: string;
+  college_name: string;
+  city: string;
+  participant_count: number;
+  min_participants_required: number;
+  redacted: boolean;
+  emotion_distribution: CampusEmotionDistributionItem[];
+  checkin_count: number;
+  trend_data: CampusTrendPoint[];
+  top_reported_emotions: CampusEmotionDistributionItem[];
+  recent_mood_trends: {
+    today: CampusWindowTrend;
+    week: CampusWindowTrend;
+    month: CampusWindowTrend;
+  } | null;
+  heatmap_points: Array<{
+    lat: number;
+    lng: number;
+    mood: Mood;
+    weight: number;
+    intensity: number;
+  }>;
 }
 
 export interface Resource {

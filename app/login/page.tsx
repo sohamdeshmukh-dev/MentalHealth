@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import { CITIES } from '@/lib/types';
 
 const generatePatientId = () => {
     const nums = Math.floor(100000 + Math.random() * 900000);
@@ -14,6 +15,14 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
+    const [selectedCity, setSelectedCity] = useState('');
+    const [selectedCollegeId, setSelectedCollegeId] = useState('');
+    const [colleges, setColleges] = useState<Array<{
+        id: string;
+        name: string;
+        city: string;
+    }>>([]);
+    const [isLoadingColleges, setIsLoadingColleges] = useState(false);
     const router = useRouter();
 
     const supabase = useMemo(() => createBrowserClient(
@@ -32,6 +41,59 @@ export default function LoginPage() {
         return () => subscription.unsubscribe();
     }, [router, supabase.auth]);
 
+    useEffect(() => {
+        if (!isSignUp || colleges.length > 0) {
+            return;
+        }
+
+        let isMounted = true;
+        setIsLoadingColleges(true);
+
+        fetch('/api/colleges')
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error('Failed to load colleges');
+                }
+                const payload = await response.json();
+                if (!isMounted) {
+                    return;
+                }
+                setColleges(Array.isArray(payload?.colleges) ? payload.colleges : []);
+            })
+            .catch((error) => {
+                console.error(error);
+                if (isMounted) {
+                    setColleges([]);
+                }
+            })
+            .finally(() => {
+                if (isMounted) {
+                    setIsLoadingColleges(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [colleges.length, isSignUp]);
+
+    const filteredColleges = useMemo(() => {
+        if (!selectedCity) {
+            return [];
+        }
+        return colleges.filter((college) => college.city === selectedCity);
+    }, [colleges, selectedCity]);
+
+    useEffect(() => {
+        if (!selectedCollegeId) {
+            return;
+        }
+        const selectedCollege = filteredColleges.find((college) => college.id === selectedCollegeId);
+        if (!selectedCollege) {
+            setSelectedCollegeId('');
+        }
+    }, [filteredColleges, selectedCollegeId]);
+
     const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -41,9 +103,12 @@ export default function LoginPage() {
                 if (error) throw error;
                 if (data?.user) {
                     const newId = generatePatientId();
+                    const selectedCollege = colleges.find((college) => college.id === selectedCollegeId);
                     const { error: profileError } = await supabase.from('profiles').insert({
                         id: data.user.id,
-                        unique_code: newId
+                        unique_code: newId,
+                        college_id: selectedCollege?.id ?? null,
+                        city: selectedCollege?.city ?? (selectedCity || null),
                     });
                     if (profileError) console.error('Failed to create initial profile:', profileError);
                 }
@@ -101,6 +166,49 @@ export default function LoginPage() {
                         />
                     </div>
 
+                    {isSignUp && (
+                        <>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-300">City</label>
+                                <select
+                                    value={selectedCity}
+                                    onChange={(e) => setSelectedCity(e.target.value)}
+                                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 p-2.5 text-slate-100 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="">Select city (optional)</option>
+                                    {CITIES.map((city) => (
+                                        <option key={city.name} value={city.name}>
+                                            {city.name}, {city.state}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-300">College</label>
+                                <select
+                                    value={selectedCollegeId}
+                                    onChange={(e) => setSelectedCollegeId(e.target.value)}
+                                    disabled={!selectedCity || isLoadingColleges}
+                                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 p-2.5 text-slate-100 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <option value="">
+                                        {isLoadingColleges
+                                            ? 'Loading colleges...'
+                                            : selectedCity
+                                                ? 'Select college (optional)'
+                                                : 'Choose city first'}
+                                    </option>
+                                    {filteredColleges.map((college) => (
+                                        <option key={college.id} value={college.id}>
+                                            {college.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </>
+                    )}
+
                     {!isSignUp && (
                         <div className="flex items-center">
                             <input
@@ -126,7 +234,11 @@ export default function LoginPage() {
                 <p className="mt-4 text-center text-sm text-slate-400">
                     {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
                     <button
-                        onClick={() => setIsSignUp(!isSignUp)}
+                        onClick={() => {
+                            setIsSignUp(!isSignUp);
+                            setSelectedCity('');
+                            setSelectedCollegeId('');
+                        }}
                         className="font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none"
                     >
                         {isSignUp ? 'Sign In' : 'Sign Up'}
