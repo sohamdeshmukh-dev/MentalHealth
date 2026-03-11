@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 import Button from "@/components/Button";
 import EmotionIntensitySlider from "@/components/EmotionIntensitySlider";
 import ImageUploader from "@/components/ImageUploader";
@@ -52,6 +54,16 @@ export default function JournalPage() {
   const [intensity, setIntensity] = useState(DEFAULT_INTENSITY);
   const [note, setNote] = useState("");
   const [weekThreshold] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [communityPulse, setCommunityPulse] = useState<{ dominant_mood: string } | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [savedMood, setSavedMood] = useState<Mood | null>(null);
+
+  useEffect(() => {
+    supabase.from('community_mood_pulse').select('*').limit(1).maybeSingle().then(({ data, error }) => {
+      if (data && !error) setCommunityPulse(data);
+    });
+  }, []);
 
   const { entries, isLoading, isSaving, saveError, saveSuccess, deletingId, saveEntry, deleteEntry } = useMoodEntry();
   const { file, previewUrl, isUploading, uploadError, selectFile, clearImage, uploadImage } = useImageUpload();
@@ -109,6 +121,9 @@ export default function JournalPage() {
     if (!didSave) {
       return;
     }
+
+    setSavedMood(selectedEmotion);
+    setShowModal(true);
 
     setSelectedEmotion(null);
     setIntensity(DEFAULT_INTENSITY);
@@ -201,20 +216,30 @@ export default function JournalPage() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Button
-                  type="submit"
-                  isLoading={isBusy}
-                  disabled={!selectedEmotion || isBusy}
-                  className="w-full"
-                >
-                  Save Journal Entry
-                </Button>
+              <motion.div className="space-y-2">
+                <motion.div animate={selectedEmotion ? { scale: [1, 1.02, 1] } : {}} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}>
+                  <Button
+                    type="submit"
+                    isLoading={isBusy}
+                    disabled={!selectedEmotion || isBusy}
+                    className="w-full relative overflow-hidden"
+                  >
+                    <span className="relative z-10">Save Journal Entry</span>
+                    {selectedMood && (
+                      <motion.div
+                        className="absolute inset-0 opacity-20"
+                        style={{ backgroundColor: selectedMood.color }}
+                        animate={{ opacity: [0.1, 0.3, 0.1] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                      />
+                    )}
+                  </Button>
+                </motion.div>
                 {isUploading ? <p className="text-xs text-teal-500">Uploading image...</p> : null}
                 {isSaving ? <p className="text-xs text-indigo-500">Saving entry...</p> : null}
                 {saveSuccess ? <p className="text-xs font-medium text-emerald-300">Entry saved ✓</p> : null}
                 {saveError ? <p className="text-xs text-red-300">{saveError}</p> : null}
-              </div>
+              </motion.div>
             </form>
 
             <aside className="space-y-6">
@@ -270,6 +295,48 @@ export default function JournalPage() {
           <MoodBalanceGraph entries={entries} />
         </section>
 
+        {/* AI Insight & Global Pulse Card */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="pb-10"
+        >
+          <div className="grid md:grid-cols-2 gap-6 bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+            {/* Left Half: Individual Forecast */}
+            <div className="flex flex-col justify-center space-y-2">
+              <h3 className="text-sm tracking-widest text-[var(--muted-text)] uppercase font-semibold">Individual Forecast</h3>
+              {(() => {
+                const isHighIntensityStreak = entries.length >= 2 && entries[0].intensity > 70 && entries[1].intensity > 70;
+                const isRecoveryForecast = entries.length >= 1 && entries[0].emotion === 'Calm';
+
+                if (isHighIntensityStreak) {
+                  return <p className="text-lg font-medium text-[var(--foreground)]">🔥 High Intensity Streak: You are in a high-output phase. Watch for burnout.</p>;
+                } else if (isRecoveryForecast) {
+                  return <p className="text-lg font-medium text-[var(--foreground)]">🌊 Recovery Forecast: Your energy is stabilizing. Great time for reflection.</p>;
+                } else {
+                  return <p className="text-lg font-medium text-[var(--foreground)]">✨ Balance Forecast: Your mood is steadily processing. Keep tracking to learn more.</p>;
+                }
+              })()}
+            </div>
+            {/* Right Half: Global Pulse */}
+            <div className="flex flex-col justify-center space-y-2 border-t border-white/10 pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+              <h3 className="text-sm tracking-widest text-[var(--muted-text)] uppercase font-semibold">Community Pulse</h3>
+              {communityPulse ? (() => {
+                const pulseMood = MOODS.find(m => m.label === communityPulse.dominant_mood);
+                const emoji = pulseMood?.icon || '😐';
+                return (
+                  <p className="text-lg font-medium text-[var(--foreground)] leading-relaxed">
+                    🌍 Most users are feeling <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 2 }} className="inline-block">{emoji}</motion.span>. You are part of a global wave of <strong>{communityPulse.dominant_mood}</strong>.
+                  </p>
+                );
+              })() : (
+                <p className="text-sm text-[var(--muted-text)]">Gathering global pulse...</p>
+              )}
+            </div>
+          </div>
+        </motion.section>
+
         <section className="py-10">
           <div className="mb-4">
             <h2 className="text-2xl font-semibold text-[var(--foreground)]">Journal Timeline</h2>
@@ -302,6 +369,59 @@ export default function JournalPage() {
           )}
         </section>
       </div>
+
+      <AnimatePresence>
+        {showModal && savedMood && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/90 overflow-hidden"
+          >
+            <motion.img
+              src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1600&q=80"
+              alt="Nature Background"
+              className="absolute inset-0 w-full h-full object-cover opacity-40 blur-sm mix-blend-overlay pointer-events-none"
+              initial={{ scale: 1 }}
+              animate={{ scale: 1.1 }}
+              transition={{ duration: 20, ease: "linear" }}
+            />
+
+            <div className="relative z-10 w-full max-w-2xl bg-black/40 backdrop-blur-md border border-white/20 p-10 rounded-3xl text-center shadow-2xl">
+              {(() => {
+                let quote = "Every feeling has its own quiet dignity.";
+                if (savedMood === "Happy") quote = "Radiate your light; the world is catching your glow.";
+                else if (savedMood === "Calm") quote = "Stillness is not the absence of movement, but the presence of peace.";
+                else if (savedMood === "Sad") quote = "Tears are the ink with which we write our truest stories.";
+                else if (savedMood === "Overwhelmed") quote = "Take a breath. You don't have to carry it all today.";
+                else if (savedMood === "Stressed") quote = "Softness is a strength when the world demands you be hard.";
+
+                return (
+                  <motion.h2
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-3xl sm:text-4xl font-serif italic text-white leading-relaxed mb-10"
+                  >
+                    "{quote}"
+                  </motion.h2>
+                );
+              })()}
+
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                <Button onClick={() => setShowModal(false)} className="px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-full transition-all">
+                  Continue to Dashboard
+                </Button>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

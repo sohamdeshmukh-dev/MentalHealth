@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { Plus, Loader2, Mic, Square, Sparkles, X, Headphones, Wind, MoreVertical } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type View = "inbox" | "new" | "chat";
 
@@ -18,6 +20,7 @@ interface Message {
     room_id: string;
     sender_id: string;
     content: string;
+    media_url?: string;
     created_at: string;
     sender?: {
         display_name?: string;
@@ -54,9 +57,20 @@ export default function FloatingChat() {
     const [groupSettingsName, setGroupSettingsName] = useState("");
     const [groupSettingsAvatar, setGroupSettingsAvatar] = useState("");
     const [isUploading, setIsUploading] = useState(false);
+    const [isMediaUploading, setIsMediaUploading] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [vibeResult, setVibeResult] = useState<string | null>(null);
+    const [isCheckingVibe, setIsCheckingVibe] = useState(false);
+    const [isFocusMode, setIsFocusMode] = useState(false);
+    const [focusTimeLeft, setFocusTimeLeft] = useState<number | null>(null);
+    const [isBreathingSync, setIsBreathingSync] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [groupMembers, setGroupMembers] = useState<any[]>([]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     // Initial Load
     useEffect(() => {
@@ -121,6 +135,20 @@ export default function FloatingChat() {
                 (payload) => {
                     const updatedRoom = payload.new;
                     setActiveRoom(prev => prev ? { ...prev, name: updatedRoom.name, display_name: updatedRoom.name || prev.display_name, avatar_url: updatedRoom.avatar_url } as Room : null);
+
+                    if (updatedRoom.focus_mode_active !== undefined) {
+                        setIsFocusMode(updatedRoom.focus_mode_active);
+                        if (updatedRoom.focus_mode_active && updatedRoom.focus_timer_ends_at) {
+                            const timeLeft = new Date(updatedRoom.focus_timer_ends_at).getTime() - Date.now();
+                            setFocusTimeLeft(timeLeft > 0 ? timeLeft : 0);
+                        } else {
+                            setFocusTimeLeft(null);
+                        }
+                    }
+                    if (updatedRoom.breathing_sync_active !== undefined) {
+                        setIsBreathingSync(updatedRoom.breathing_sync_active);
+                    }
+
                     if (currentUser) fetchInbox(currentUser.id);
                 }
             )
@@ -131,6 +159,64 @@ export default function FloatingChat() {
             supabase.removeChannel(roomChannel);
         };
     }, [activeRoom, view, supabase, currentUser]);
+
+    // Fetch Room Profile/Status on Load
+    useEffect(() => {
+        const loadRoomData = async () => {
+            if (!activeRoom) return;
+            try {
+                const { data, error } = await supabase
+                    .from('chat_rooms')
+                    .select('name, avatar_url, focus_mode_active, focus_timer_ends_at, breathing_sync_active')
+                    .eq('id', activeRoom.id)
+                    .single();
+
+                if (data) {
+                    setIsFocusMode(data.focus_mode_active || false);
+                    setIsBreathingSync(data.breathing_sync_active || false);
+                    if (data.focus_mode_active && data.focus_timer_ends_at) {
+                        const timeLeft = new Date(data.focus_timer_ends_at).getTime() - Date.now();
+                        setFocusTimeLeft(timeLeft > 0 ? timeLeft : 0);
+                    } else {
+                        setFocusTimeLeft(null);
+                    }
+
+                    if (activeRoom.is_group) {
+                        setActiveRoom(prev => prev ? {
+                            ...prev,
+                            name: data.name || 'Default Group Name',
+                            display_name: data.name || prev.display_name,
+                            avatar_url: data.avatar_url || 'default-avatar.png'
+                        } : null);
+                    }
+                }
+            } catch (err: any) {
+                console.error("Fetch room data error:", err);
+            }
+        };
+        loadRoomData();
+    }, [activeRoom?.id, supabase]);
+
+    useEffect(() => {
+        if (!isFocusMode || focusTimeLeft === null) return;
+
+        const interval = setInterval(() => {
+            setFocusTimeLeft(prev => {
+                if (prev === null || prev <= 1000) return 0;
+                return prev - 1000;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isFocusMode, focusTimeLeft]);
+
+    const formatTime = (ms: number | null) => {
+        if (ms === null || ms <= 0) return "00:00";
+        const totalSeconds = Math.floor(ms / 1000);
+        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
 
     const fetchInbox = async (userId: string) => {
         setIsLoading(true);
@@ -319,14 +405,203 @@ export default function FloatingChat() {
         try {
             const { error } = await supabase
                 .from('chat_rooms')
-                .update({ name: groupSettingsName, avatar_url: groupSettingsAvatar })
+                .update({
+                    name: groupSettingsName,
+                    avatar_url: groupSettingsAvatar
+                })
                 .eq('id', activeRoom.id);
+
             if (error) throw error;
-            setActiveRoom({ ...activeRoom, name: groupSettingsName, display_name: groupSettingsName, avatar_url: groupSettingsAvatar });
+
+            setActiveRoom({
+                ...activeRoom,
+                name: groupSettingsName,
+                display_name: groupSettingsName,
+                avatar_url: groupSettingsAvatar
+            });
             setShowGroupSettings(false);
             fetchInbox(currentUser.id);
         } catch (err: any) {
             console.error("Save settings error:", err?.message || err?.details || JSON.stringify(err) || err);
+        }
+    };
+
+    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !activeRoom || !currentUser) return;
+        const file = e.target.files[0];
+        setIsMediaUploading(true);
+
+        try {
+            const fileName = `${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('chat-media').upload(fileName, file);
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+
+            const msgId = crypto.randomUUID();
+
+            // Optimistic Update
+            const optimisticMsg: Message = {
+                id: msgId,
+                room_id: activeRoom.id,
+                sender_id: currentUser.id,
+                content: "",
+                media_url: data.publicUrl,
+                created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, optimisticMsg]);
+
+            const { error } = await supabase
+                .from('messages')
+                .insert({
+                    id: msgId,
+                    room_id: activeRoom.id,
+                    sender_id: currentUser.id,
+                    content: "",
+                    media_url: data.publicUrl
+                });
+
+            if (error) throw error;
+        } catch (err: any) {
+            console.error("Media upload error:", err);
+        } finally {
+            setIsMediaUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const fileName = `${Date.now()}-voicememo.webm`;
+                setIsMediaUploading(true);
+                try {
+                    const { error: uploadError } = await supabase.storage.from('chat-media').upload(fileName, audioBlob);
+                    if (uploadError) throw uploadError;
+
+                    const { data } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+
+                    const msgId = crypto.randomUUID();
+                    const optimisticMsg: Message = {
+                        id: msgId,
+                        room_id: activeRoom!.id,
+                        sender_id: currentUser.id,
+                        content: "🎤 Voice Memo",
+                        media_url: data.publicUrl,
+                        created_at: new Date().toISOString(),
+                    };
+                    setMessages((prev) => [...prev, optimisticMsg]);
+
+                    const { error } = await supabase.from('messages').insert({
+                        id: msgId,
+                        room_id: activeRoom!.id,
+                        sender_id: currentUser.id,
+                        content: "🎤 Voice Memo",
+                        media_url: data.publicUrl
+                    });
+                    if (error) throw error;
+                } catch (err) {
+                    console.error("Audio upload error:", err);
+                } finally {
+                    setIsMediaUploading(false);
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (err) {
+            console.error("Mic error:", err);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            const tracks = mediaRecorderRef.current.stream.getTracks();
+            tracks.forEach(track => track.stop());
+        }
+    };
+
+    const handleToggleFocus = async () => {
+        if (!activeRoom) return;
+        try {
+            const newState = !isFocusMode;
+            const endsAt = newState ? new Date(Date.now() + 25 * 60000).toISOString() : null;
+
+            setIsFocusMode(newState);
+            if (newState) {
+                setFocusTimeLeft(25 * 60000);
+            } else {
+                setFocusTimeLeft(null);
+            }
+
+            const { error } = await supabase
+                .from('chat_rooms')
+                .update({ focus_mode_active: newState, focus_timer_ends_at: endsAt })
+                .eq('id', activeRoom.id);
+            if (error) throw error;
+        } catch (err: any) {
+            console.error("Toggle focus error:", err);
+        }
+    };
+
+    const handleVibeCheck = async () => {
+        setIsCheckingVibe(true);
+        try {
+            const chatHistory = messages
+                .slice(-15)
+                .filter(m => !m.media_url || m.content.trim() !== "")
+                .map(m => `${m.sender?.display_name || 'User'}: ${m.content}`)
+                .join('\n');
+
+            console.log('Vibe check started', chatHistory);
+
+            const res = await fetch('/api/vibe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatHistory })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                throw new Error(errData?.error || `Failed with status ${res.status}`);
+            }
+
+            const data = await res.json();
+            if (data.vibe) {
+                setVibeResult(data.vibe);
+            }
+        } catch (err: any) {
+            console.error("Vibe check error:", err);
+            alert(`Error checking vibe: ${err?.message || 'The AI is currently resting.'}`);
+        } finally {
+            setIsCheckingVibe(false);
+        }
+    };
+
+    // 2. The Toggle Action
+    const handleToggleBreathing = async () => {
+        if (!activeRoom) return;
+        try {
+            const { error } = await supabase
+                .from('chat_rooms')
+                .update({ breathing_sync_active: !isBreathingSync })
+                .eq('id', activeRoom.id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to toggle breathing sync:', err);
         }
     };
 
@@ -377,7 +652,39 @@ export default function FloatingChat() {
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
             {/* Chat Body */}
             {isOpen && (
-                <div className="mb-4 w-[350px] h-[600px] bg-white dark:bg-black border-[8px] border-slate-800 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+                <div className="mb-4 w-[350px] h-[600px] bg-white dark:bg-black border-[8px] border-slate-800 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300 relative">
+                    {/* 4. The Immersive Breathing Overlay */}
+                    <AnimatePresence>
+                        {isBreathingSync && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-50 bg-black/40 backdrop-blur-2xl flex flex-col items-center justify-center rounded-2xl"
+                            >
+                                {/* The Animated Lung/Circle */}
+                                <motion.div
+                                    animate={{ scale: [1, 2, 1] }}
+                                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                                    className="w-32 h-32 rounded-full bg-teal-500/20 border-2 border-teal-400/50 shadow-[0_0_50px_rgba(45,212,191,0.4)]"
+                                />
+
+                                {/* The Text */}
+                                <p className="mt-16 text-xl font-light tracking-widest text-teal-50">
+                                    Breathe together...
+                                </p>
+
+                                {/* The Exit Button */}
+                                <button
+                                    onClick={handleToggleBreathing}
+                                    className="mt-12 px-6 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white backdrop-blur-md transition-all shadow-lg"
+                                >
+                                    End Sync
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Header */}
                     <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white/80 dark:bg-black/80 backdrop-blur-md relative z-10">
                         <div className="flex items-center gap-1 w-1/4">
@@ -415,6 +722,47 @@ export default function FloatingChat() {
                         </div>
 
                         <div className="flex items-center justify-end gap-2 w-1/4">
+                            {view === "chat" && (
+                                <div className="relative">
+                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-gray-400 hover:text-white transition">
+                                        <MoreVertical className="w-5 h-5" />
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {isMenuOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                className="absolute right-0 top-full mt-2 w-48 py-2 bg-gray-900/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 flex flex-col"
+                                            >
+                                                <button
+                                                    onClick={() => { handleVibeCheck(); setIsMenuOpen(false); }}
+                                                    className="w-full text-left px-4 py-3 flex items-center space-x-3 hover:bg-white/5 transition-colors text-sm text-gray-200"
+                                                >
+                                                    <Sparkles className={`w-4 h-4 ${isCheckingVibe ? 'animate-spin text-indigo-400' : 'text-indigo-400'}`} />
+                                                    <span>Vibe Check</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => { handleToggleFocus(); setIsMenuOpen(false); }}
+                                                    className="w-full text-left px-4 py-3 flex items-center space-x-3 hover:bg-white/5 transition-colors text-sm text-gray-200"
+                                                >
+                                                    <Headphones className={`w-4 h-4 ${isFocusMode ? 'text-amber-500' : 'text-gray-400'}`} />
+                                                    <span>Focus Mode</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => { handleToggleBreathing(); setIsMenuOpen(false); }}
+                                                    className="w-full text-left px-4 py-3 flex items-center space-x-3 hover:bg-white/5 transition-colors text-sm text-gray-200"
+                                                >
+                                                    <Wind className={`w-4 h-4 ${isBreathingSync ? 'text-teal-400' : 'text-gray-400'}`} />
+                                                    <span>Sync Breathing</span>
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )}
+
                             {view === "chat" && activeRoom?.is_group && (
                                 <button
                                     onClick={() => {
@@ -590,6 +938,54 @@ export default function FloatingChat() {
 
                         {view === "chat" && !showGroupSettings && (
                             <div className="space-y-4 pb-2">
+                                <AnimatePresence>
+                                    {isFocusMode && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="overflow-hidden mb-4"
+                                        >
+                                            <div className="bg-white/10 backdrop-blur-md border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)] rounded-2xl p-3">
+                                                <div className="flex items-center justify-between mb-2 px-1">
+                                                    <div className="font-bold text-amber-200 text-xs flex items-center gap-1.5">
+                                                        <Headphones className="w-4 h-4" /> Lofi Focus Mode
+                                                    </div>
+                                                    <div className="font-mono text-amber-200 text-sm tracking-widest font-bold">
+                                                        {formatTime(focusTimeLeft)}
+                                                    </div>
+                                                </div>
+                                                <iframe
+                                                    width="100%"
+                                                    height="120"
+                                                    src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
+                                                    title="Lofi Girl"
+                                                    frameBorder="0"
+                                                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                                                    className="rounded-xl w-full"
+                                                ></iframe>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                <AnimatePresence>
+                                    {vibeResult && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="bg-white/10 backdrop-blur-md border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)] rounded-xl p-4 mb-4 text-sm text-indigo-50 relative"
+                                        >
+                                            <button onClick={() => setVibeResult(null)} className="absolute top-2 right-2 p-1 text-indigo-200 hover:text-white transition-colors">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                            <div className="font-bold mb-1 flex items-center gap-1.5 text-indigo-200">
+                                                <Sparkles className="w-4 h-4" /> Vibe Check
+                                            </div>
+                                            <p className="leading-relaxed text-[13px]">{vibeResult}</p>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                                 {messages.map(msg => {
                                     const isMe = msg.sender_id === currentUser.id;
                                     return (
@@ -612,6 +1008,19 @@ export default function FloatingChat() {
                                                         }`}
                                                 >
                                                     {msg.content}
+                                                    {msg.media_url && (
+                                                        msg.media_url.match(/\.(webm|mp3|ogg)$/i) && msg.content.includes("Voice Memo") ? (
+                                                            <audio src={msg.media_url} controls className="w-64 mt-2 h-10 outline-none" />
+                                                        ) : (
+                                                            <div className="mt-2 text-left w-full h-full max-w-[200px] sm:max-w-xs object-cover overflow-hidden rounded-2xl block border border-black/10 dark:border-white/10">
+                                                                {msg.media_url.match(/\.(mp4|webm|mov)$/i) ? (
+                                                                    <video src={msg.media_url} controls className="w-full shadow-lg" />
+                                                                ) : (
+                                                                    <img src={msg.media_url} alt="Uploaded media" className="w-full shadow-lg object-cover" />
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -628,21 +1037,53 @@ export default function FloatingChat() {
                     {
                         view === "chat" && (
                             <div className="p-3 bg-white/80 dark:bg-black/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-10 shrink-0">
-                                <form onSubmit={handleSendMessage} className="relative flex items-center">
-                                    <input
-                                        type="text"
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        placeholder="iMessage"
-                                        className="w-full bg-transparent border border-gray-300 dark:border-gray-700 rounded-full pl-4 pr-10 py-[6px] text-[15px] text-black dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-500 placeholder:text-gray-400 transition-colors"
-                                    />
+                                <input
+                                    type="file"
+                                    accept="image/*,video/*"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleMediaUpload}
+                                />
+                                <form onSubmit={handleSendMessage} className="relative flex items-center gap-2">
                                     <button
-                                        type="submit"
-                                        disabled={!newMessage.trim()}
-                                        className="absolute right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white disabled:opacity-0 transition-opacity duration-200"
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isMediaUploading || isRecording}
+                                        className="h-8 w-8 text-gray-400 hover:text-blue-500 transition-colors flex items-center justify-center shrink-0"
                                     >
-                                        <svg className="w-4 h-4 ml-0.5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                        {isMediaUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        disabled={isMediaUploading}
+                                        className="h-8 w-8 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center shrink-0 relative"
+                                    >
+                                        {isRecording ? (
+                                            <>
+                                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity }} className="absolute inset-0 bg-red-500/20 rounded-full" />
+                                                <Square className="w-4 h-4 text-red-500 fill-red-500 relative z-10" />
+                                            </>
+                                        ) : (
+                                            <Mic className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="text"
+                                            value={newMessage}
+                                            onChange={(e) => setNewMessage(e.target.value)}
+                                            placeholder="iMessage"
+                                            className="w-full bg-transparent border border-gray-300 dark:border-gray-700 rounded-full pl-4 pr-10 py-[6px] text-[15px] text-black dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-500 placeholder:text-gray-400 transition-colors"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!newMessage.trim()}
+                                            className="absolute right-1 top-1 bottom-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white disabled:opacity-0 transition-opacity duration-200"
+                                        >
+                                            <svg className="w-4 h-4 ml-0.5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         )

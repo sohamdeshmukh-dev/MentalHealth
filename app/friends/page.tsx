@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Leaderboard from "@/components/Leaderboard";
 import { createBrowserClient } from "@supabase/ssr";
 import FloatingChat from "@/components/FloatingChat";
@@ -21,6 +22,15 @@ export default function FriendsPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [myProfile, setMyProfile] = useState<any>(null);
 
+    const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+    const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+    const [toast, setToast] = useState<{ message: string, visible: boolean }>({ message: '', visible: false });
+
+    const showToast = useCallback((message: string) => {
+        setToast({ message, visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+    }, []);
+
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -34,7 +44,6 @@ export default function FriendsPage() {
 
             const data = await res.json();
 
-            setAcceptedFriends(data.friends || []);
             setPendingRequests(data.incoming_requests || []);
             setSentRequests(data.sent_requests || []);
             setMyEntryCount(data.my_entry_count || 0);
@@ -58,9 +67,110 @@ export default function FriendsPage() {
         }
     }, [supabase]);
 
+    const fetchRequests = useCallback(async () => {
+        if (!currentUser) return;
+        try {
+            const { data: incomingData } = await supabase
+                .from("friendships")
+                .select("*")
+                .eq("friend_id", currentUser.id)
+                .eq("status", "pending");
+
+            const { data: outgoingData } = await supabase
+                .from("friendships")
+                .select("*")
+                .eq("user_id", currentUser.id)
+                .eq("status", "pending");
+
+            const allProfileIds = new Set([
+                ...(incomingData || []).map(r => r.user_id),
+                ...(outgoingData || []).map(r => r.friend_id)
+            ]);
+
+            let profilesMap: Record<string, any> = {};
+            if (allProfileIds.size > 0) {
+                const { data: profiles } = await supabase
+                    .from("profiles")
+                    .select("id, display_name, avatar_url, unique_code")
+                    .in("id", Array.from(allProfileIds));
+                profiles?.forEach(p => { profilesMap[p.id] = p; });
+            }
+
+            setIncomingRequests((incomingData || []).map(r => ({ ...r, profile: profilesMap[r.user_id] })));
+            setOutgoingRequests((outgoingData || []).map(r => ({ ...r, profile: profilesMap[r.friend_id] })));
+        } catch (err) {
+            console.error("Error fetching friend requests", err);
+        }
+    }, [currentUser, supabase]);
+
+    const fetchFriends = useCallback(async () => {
+        if (!currentUser) return;
+        try {
+            const { data, error } = await supabase
+                .from('friendships')
+                .select(`
+                    id,
+                    status,
+                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code),
+                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code)
+                `)
+                .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
+                .eq('status', 'accepted');
+
+            if (error) {
+                // Fallback join if the explicit fkey syntax fails
+                const { data: fallbackData } = await supabase
+                    .from('friendships')
+                    .select(`
+                        id,
+                        status,
+                        sender:user_id (id, display_name, avatar_url, unique_code),
+                        receiver:friend_id (id, display_name, avatar_url, unique_code)
+                    `)
+                    .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
+                    .eq('status', 'accepted');
+
+                if (fallbackData) {
+                    const formattedFriends = fallbackData.map((row: any) => {
+                        const isSender = row.sender.id === currentUser.id;
+                        const friendProfile = isSender ? row.receiver : row.sender;
+                        return {
+                            id: row.id,
+                            friend_id: friendProfile.id,
+                            profile: friendProfile,
+                            entry_count: 0
+                        };
+                    });
+                    setAcceptedFriends(formattedFriends);
+                }
+            } else if (data) {
+                const formattedFriends = data.map((row: any) => {
+                    const isSender = row.sender.id === currentUser.id;
+                    const friendProfile = isSender ? row.receiver : row.sender;
+                    return {
+                        id: row.id,
+                        friend_id: friendProfile.id,
+                        profile: friendProfile,
+                        entry_count: 0
+                    };
+                });
+                setAcceptedFriends(formattedFriends);
+            }
+        } catch (err) {
+            console.error("Error fetching accepted friends:", err);
+        }
+    }, [currentUser, supabase]);
+
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    useEffect(() => {
+        if (currentUser) {
+            fetchRequests();
+            fetchFriends();
+        }
+    }, [currentUser, fetchRequests, fetchFriends]);
 
     async function handleAddFriend(e: React.FormEvent) {
         e.preventDefault();
@@ -111,6 +221,32 @@ export default function FriendsPage() {
         }
     }
 
+    async function handleAcceptRequest(requestId: string) {
+        setProcessingId(requestId);
+        try {
+            await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
+            fetchRequests();
+            fetchFriends();
+            showToast("Friend request accepted!");
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+        }
+    }
+
+    async function handleWithdrawOrReject(requestId: string) {
+        setProcessingId(requestId);
+        try {
+            await supabase.from("friendships").delete().eq("id", requestId);
+            fetchRequests();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+        }
+    }
+
     async function handleAccept(id: string) {
         setProcessingId(id);
         try {
@@ -118,7 +254,8 @@ export default function FriendsPage() {
                 .from("friendships")
                 .update({ status: "accepted" })
                 .eq("id", id);
-            fetchData();
+            fetchRequests();
+            fetchFriends();
         } finally {
             setProcessingId(null);
         }
@@ -157,7 +294,7 @@ export default function FriendsPage() {
                 .from("friendships")
                 .delete()
                 .eq("id", id);
-            fetchData();
+            fetchFriends();
         } finally {
             setProcessingId(null);
         }
@@ -250,6 +387,106 @@ export default function FriendsPage() {
                     </div>
                 ) : activeTab === "friends" ? (
                     <div className="space-y-6">
+                        {/* New Pending Connections UI */}
+                        {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
+                            <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl mb-6">
+                                <h2 className="text-xl font-semibold text-white mb-4">Pending Connections</h2>
+
+                                <AnimatePresence>
+                                    {incomingRequests.length > 0 && (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-4">
+                                            <h3 className="text-xs uppercase tracking-widest text-emerald-400 mb-2 font-semibold">Incoming</h3>
+                                            <div className="space-y-3">
+                                                {incomingRequests.map((req) => (
+                                                    <motion.div
+                                                        key={req.id}
+                                                        initial={{ opacity: 0, x: -20 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="flex items-center justify-between bg-white/[0.03] border border-white/[0.05] rounded-xl p-3"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                                {req.profile?.avatar_url ? (
+                                                                    <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="text-lg text-slate-500">👤</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-semibold text-white truncate">
+                                                                    {req.profile?.display_name || req.profile?.unique_code || "Unknown"}
+                                                                </p>
+                                                                {req.profile?.display_name && (
+                                                                    <p className="text-[11px] text-slate-400 truncate">#{req.profile?.unique_code}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2 shrink-0">
+                                                            <button
+                                                                onClick={() => handleAcceptRequest(req.id)}
+                                                                disabled={processingId === req.id}
+                                                                className="rounded-lg bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/40 hover:shadow-[0_0_15px_rgba(52,211,153,0.4)] transition-all disabled:opacity-50 flex items-center gap-1"
+                                                            >
+                                                                ✅ Accept
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleWithdrawOrReject(req.id)}
+                                                                disabled={processingId === req.id}
+                                                                className="rounded-lg bg-black/40 border border-red-900/40 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                            >
+                                                                ❌ Decline
+                                                            </button>
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                    {outgoingRequests.length > 0 && (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                            <h3 className="text-xs uppercase tracking-widest text-slate-400 mb-2 font-semibold">Outgoing</h3>
+                                            <div className="space-y-3">
+                                                {outgoingRequests.map((req) => (
+                                                    <motion.div
+                                                        key={req.id}
+                                                        initial={{ opacity: 0, x: -20 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="flex items-center justify-between bg-white/[0.03] border border-white/[0.05] rounded-xl p-3"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                                {req.profile?.avatar_url ? (
+                                                                    <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="text-lg text-slate-500">👤</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-semibold text-white truncate">
+                                                                    {req.profile?.display_name || req.profile?.unique_code || "Unknown"}
+                                                                </p>
+                                                                {req.profile?.display_name && (
+                                                                    <p className="text-[11px] text-slate-400 truncate">#{req.profile?.unique_code}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleWithdrawOrReject(req.id)}
+                                                            disabled={processingId === req.id}
+                                                            className="shrink-0 rounded-lg bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 text-[11px] font-medium text-slate-300 hover:bg-slate-700 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                        >
+                                                            ↩️ Withdraw
+                                                        </button>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                         {/* Incoming Requests */}
                         {pendingRequests.length > 0 && (
                             <div>
@@ -402,6 +639,20 @@ export default function FriendsPage() {
                 )}
             </div>
             <FloatingChat />
+
+            <AnimatePresence>
+                {toast.visible && (
+                    <motion.div
+                        initial={{ x: 300, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 300, opacity: 0 }}
+                        className="fixed top-24 right-6 z-[200] bg-emerald-600 text-white px-6 py-4 rounded-xl shadow-2xl border-l-4 border-emerald-400 flex items-center gap-3 font-medium backdrop-blur-md"
+                    >
+                        <span className="text-xl">✅</span>
+                        {toast.message}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

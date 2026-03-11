@@ -331,7 +331,7 @@ export default function AITherapistPage() {
     };
   }, [voiceMode]); // handleSendMessage is stable via conversation ref
 
-  /* ─── Chat logic (with TTS support) ─── */
+  /* ─── Chat logic ─── */
   const handleSendMessage = useCallback(
     async (text: string) => {
       const userMsg: Message = {
@@ -351,22 +351,18 @@ export default function AITherapistPage() {
           .filter((m) => m.id !== "intro")
           .map((m) => ({ role: m.role, content: m.text }));
 
-        const res = await fetch("/api/therapist", {
+        const updatedMessages = [...history, { role: "user", content: text }];
+
+        const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            history,
-            tts: voiceModeRef.current,
-          }),
+          body: JSON.stringify({ messages: updatedMessages }),
         });
 
         let reply: string;
-        let audioB64: string | null = null;
         if (res.ok) {
           const data = await res.json();
-          reply = data.reply;
-          audioB64 = data.audioBase64 || null;
+          reply = data.message;
         } else {
           reply = AI_REFLECTIONS[Math.floor(Math.random() * AI_REFLECTIONS.length)];
         }
@@ -378,15 +374,7 @@ export default function AITherapistPage() {
         };
         setConversation((c) => [...c, aiMsg]);
 
-        if (audioB64 && voiceModeRef.current) {
-          const ttsAudio = new Audio(`data:audio/mp3;base64,${audioB64}`);
-          ttsAudio.play().catch(() => { });
-          ttsAudio.onended = () => {
-            if (voiceModeRef.current && recognitionRef.current) {
-              try { recognitionRef.current.start(); } catch { /* ignore */ }
-            }
-          };
-        } else if (voiceModeRef.current && recognitionRef.current) {
+        if (voiceModeRef.current && recognitionRef.current) {
           try { recognitionRef.current.start(); } catch { /* ignore */ }
         }
       } catch {
