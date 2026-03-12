@@ -1092,23 +1092,28 @@ export default function AITherapistPage() {
      RENDER — The Lofi Desk
      ═══════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-stone-900 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-stone-950 p-4 md:p-8 flex gap-4 md:gap-8 items-center justify-center"
+    <div className="min-h-[100dvh] bg-stone-900 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-stone-950 p-4 md:p-8 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center overflow-x-hidden"
       style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
     >
       {/* SLIDING SIDEBAR OVERLAY */}
+      {/* Dark background click-to-close */}
       {isSidebarOpen && (
-          <div className="fixed inset-0 z-[10000] flex">
-              {/* Dark background click-to-close */}
-              <div 
-                  className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-                  onClick={() => setIsSidebarOpen(false)}
-              />
+        <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity z-[9999]"
+            onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-              {/* The Sidebar panel */}
-              <div className="relative w-80 bg-[#faf9f5] border-r border-gray-200 h-full shadow-2xl p-4 flex flex-col transform transition-transform duration-300">
+      {/* The Sidebar panel */}
+      <div className={`
+          fixed bg-[#faf9f5] transition-transform duration-300
+          inset-0 z-[10000] flex flex-col p-4
+          md:inset-y-0 md:left-0 md:right-auto md:w-80 md:border-r border-gray-200 shadow-2xl
+          ${isSidebarOpen ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:-translate-x-full'}
+      `}>
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="font-serif text-xl text-gray-800 m-0">Past Sessions</h2>
-                      <button onClick={startNewChat} className="text-teal-600 hover:text-teal-700 bg-transparent border-0 cursor-pointer p-2 text-sm font-medium">
+                      <button onClick={startNewChat} className="text-teal-600 hover:text-teal-700 bg-transparent border-0 cursor-pointer p-3 md:p-2 text-base md:text-sm font-medium">
                           + New Chat
                       </button>
                   </div>
@@ -1144,13 +1149,11 @@ export default function AITherapistPage() {
                       )}
                   </div>
               </div>
-          </div>
-      )}
 
       {/* ═══════════════════════════════════════════
           LEFT SIDE — Typewriter Paper (Chat)
           ═══════════════════════════════════════════ */}
-      <div className="w-1/2 h-[85vh] bg-[#fdfbf7] rounded-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-stone-300 p-6 md:p-8 flex flex-col relative overflow-hidden">
+      <div className="w-full md:w-1/2 h-[80dvh] md:h-[85vh] bg-[#fdfbf7] rounded-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-stone-300 p-4 md:p-6 lg:p-8 flex flex-col relative overflow-hidden">
 
         {/* Paper texture lines */}
         <div className="absolute inset-0 pointer-events-none z-0"
@@ -1165,7 +1168,7 @@ export default function AITherapistPage() {
         <div className="relative z-10 mb-4 flex-shrink-0">
           <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-2 transition"
+              className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-2 transition p-3 -ml-3 md:p-1 md:-ml-1"
           >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
               Chat History
@@ -1249,11 +1252,10 @@ export default function AITherapistPage() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Voice Mode Toggle */}
         <div className="flex items-center gap-3 pt-2 pb-1 pl-8 relative z-10 flex-shrink-0">
           <button 
               onClick={isLiveCall ? stopLiveTherapy : startLiveTherapy}
-              className={`px-4 py-2 rounded-full font-medium transition-colors ${
+              className={`px-4 py-3 md:py-2 rounded-full font-medium transition-colors text-base md:text-sm ${
                   isLiveCall 
                   ? "bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500/30" 
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -1307,7 +1309,7 @@ export default function AITherapistPage() {
       {/* ═══════════════════════════════════════════
           RIGHT SIDE — Lofi Tools
           ═══════════════════════════════════════════ */}
-      <div className="w-1/2 h-[85vh] flex flex-col gap-5">
+      <div className="w-full md:w-1/2 h-auto md:h-[85vh] flex flex-col gap-5">
 
         {/* ─── A. Vintage Tape Recorder (Top ~40%) ─── */}
         <div className="w-full bg-neutral-800 rounded-2xl shadow-2xl border-b-[6px] border-neutral-950 p-5 flex flex-col items-center justify-between relative overflow-hidden"

@@ -773,13 +773,13 @@ export default function FloatingChat() {
                                             fetchGroupMembers(activeRoom.id);
                                         }
                                     }}
-                                    className="text-blue-500 hover:text-blue-600 transition p-1"
+                                    className="text-blue-500 hover:text-blue-600 transition p-2 md:p-1"
                                     title="Group Info"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 </button>
                             )}
-                            <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition p-1 shrink-0" title="Close">
+                            <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition p-3 md:p-1 shrink-0" title="Close">
                                 <span className="font-bold text-sm bg-gray-200 dark:bg-gray-800 rounded-full h-6 w-6 flex items-center justify-center text-gray-500 dark:text-gray-400">✕</span>
                             </button>
                         </div>
@@ -976,7 +976,7 @@ export default function FloatingChat() {
                                             exit={{ opacity: 0, scale: 0.95 }}
                                             className="bg-white/10 backdrop-blur-md border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)] rounded-xl p-4 mb-4 text-sm text-indigo-50 relative"
                                         >
-                                            <button onClick={() => setVibeResult(null)} className="absolute top-2 right-2 p-1 text-indigo-200 hover:text-white transition-colors">
+                                            <button onClick={() => setVibeResult(null)} className="absolute top-2 right-2 p-3 md:p-1 text-indigo-200 hover:text-white transition-colors">
                                                 <X className="w-4 h-4" />
                                             </button>
                                             <div className="font-bold mb-1 flex items-center gap-1.5 text-indigo-200">

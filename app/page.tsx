@@ -196,7 +196,7 @@ export default function Home() {
   }, [checkins, isCampusMode, registeredCollege?.id, registeredCollege?.name, timeFilter, seedPoints]);
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[var(--background)] p-2 sm:p-4">
+    <div className="h-[100dvh] w-full overflow-hidden bg-[var(--background)] p-2 sm:p-4">
       <div className="relative h-full w-full overflow-hidden rounded-[26px] border border-[var(--border-soft)] shadow-2xl sm:rounded-[32px]">
         <Map3DView
           checkins={filteredCheckins}
@@ -208,41 +208,47 @@ export default function Home() {
           focusRegisteredCampus={isCampusMode}
         />
 
-        <div className="pointer-events-auto absolute right-3 top-20 z-[50] flex flex-col items-end gap-2 sm:right-5 sm:top-5">
-          <div className="flex cursor-pointer rounded-full border border-[var(--border-soft)] bg-[var(--surface-1)] p-1 shadow-lg backdrop-blur-md">
-            {["All", "Morning", "Afternoon", "Evening", "Night"].map((filterName) => (
-              <div
-                key={filterName}
-                onClick={() => setTimeFilter(filterName)}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition-colors sm:px-4 sm:text-xs ${timeFilter === filterName
-                  ? "bg-indigo-600 text-white shadow"
-                  : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
-                  }`}
-              >
-                {filterName}
-              </div>
-            ))}
-          </div>
-
-          {effectiveCampusName && (
-            <button
-              onClick={() => setIsCampusMode((value) => !value)}
-              className={`rounded-full border px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors ${isCampusMode
-                ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
-                : "border-[var(--border-soft)] bg-[var(--surface-1)] text-[var(--muted-text)] hover:bg-[var(--surface-2)]"
-                }`}
-            >
-              🎓 Focus on Campus: {effectiveCampusName}
-            </button>
-          )}
-        </div>
-
-        <div className="pointer-events-auto absolute left-1/2 top-20 z-10 -translate-x-1/2 sm:top-5">
+        {/* TOP BAR (Location Search) */}
+        <div className="pointer-events-auto absolute left-1/2 top-2 z-[40] -translate-x-1/2 sm:top-5">
           <CityNavigator currentIndex={cityIndex} onNavigate={setCityIndex} />
         </div>
 
-        <div className="pointer-events-none absolute bottom-6 left-6 z-[45]">
-          <LocalClock selectedCity={city.name} selectedState={city.state} />
+        {/* BOTTOM ACTION BAR (Filters & Tools) */}
+        <div className="pointer-events-none absolute bottom-0 left-0 z-[50] w-full p-2 sm:p-4">
+          <div className="pointer-events-auto mx-auto flex w-full max-w-md flex-col gap-3 rounded-2xl bg-black/60 p-3 shadow-2xl backdrop-blur-xl sm:rounded-3xl sm:p-4">
+            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {["All", "Morning", "Afternoon", "Evening", "Night"].map((filterName) => (
+                <button
+                  key={filterName}
+                  onClick={() => setTimeFilter(filterName)}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold tracking-wide transition-colors ${timeFilter === filterName
+                    ? "bg-[var(--accent)] text-white shadow"
+                    : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
+                    }`}
+                >
+                  {filterName}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="origin-left scale-[0.65] sm:scale-75">
+                <LocalClock selectedCity={city.name} selectedState={city.state} />
+              </div>
+
+              {effectiveCampusName && (
+                <button
+                  onClick={() => setIsCampusMode((value) => !value)}
+                  className={`rounded-full border px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors ${isCampusMode
+                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
+                    : "border-white/10 bg-white/10 text-white/90 hover:bg-white/20"
+                    }`}
+                >
+                  🎓 {effectiveCampusName}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
