@@ -31,8 +31,10 @@ export default function ProfilePage() {
     const [college, setCollege] = useState<College | null>(null);
     const [campusInsights, setCampusInsights] = useState<CampusEmotionResponse | null>(null);
     const [isCampusLoading, setIsCampusLoading] = useState(false);
-    const [counts, setCounts] = useState({ checkins: 0, journals: 0 });
+    const [journalCount, setJournalCount] = useState(0);
+    const [checkInCount, setCheckInCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [userEmail, setUserEmail] = useState<string>("Loading...");
     const [showAvatars, setShowAvatars] = useState(false);
     const [displayName, setDisplayName] = useState("");
     const [savingUsername, setSavingUsername] = useState(false);
@@ -44,6 +46,8 @@ export default function ProfilePage() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+
+            setUserEmail(user.email || "No email available");
 
             // Fetch profile
             const { data: profileData } = await supabase
@@ -61,7 +65,7 @@ export default function ProfilePage() {
             // Fetch counts
             const [checkinRes, journalRes] = await Promise.all([
                 supabase.from('checkins').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-                supabase.from('mood_journal').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+                supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
             ]);
 
             // Fetch journal entries
@@ -85,10 +89,8 @@ export default function ProfilePage() {
             setContacts(contactsData || []);
             setJournalEntries(journalData || []);
             setCollege(collegeData);
-            setCounts({
-                checkins: checkinRes.count || 0,
-                journals: journalRes.count || 0
-            });
+            setCheckInCount(checkinRes.count || 0);
+            setJournalCount(journalRes.count || 0);
             setDisplayName(profileData?.display_name || "");
             setShieldActive(profileData?.impulse_shield_active || false);
         } catch (err: any) {
@@ -251,7 +253,7 @@ export default function ProfilePage() {
             if (error) throw error;
 
             setJournalEntries([]);
-            setCounts((prev) => ({ ...prev, journals: 0 }));
+            setJournalCount(0);
             setToastMessage("🗑️ All journal entries deleted.");
             setTimeout(() => setToastMessage(null), 3000);
         } catch (err) {
@@ -455,16 +457,20 @@ export default function ProfilePage() {
                             <div className="text-[11px] text-slate-400 font-mono tracking-wider mb-3">
                                 Code: {profile?.unique_code || "HACK-2024"}
                             </div>
-                            <div className="text-[12px] text-slate-500">{profile?.email || "user@example.com"}</div>
+                             <div className="text-[12px] text-slate-500">{userEmail}</div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-teal-400">{counts.checkins}</div>
+                                <div className="text-xl font-bold text-teal-400">
+                                    {isLoading ? "..." : checkInCount}
+                                </div>
                                 <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Check-ins</div>
                             </div>
                             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-indigo-400">{counts.journals}</div>
+                                <div className="text-xl font-bold text-indigo-400">
+                                    {isLoading ? "..." : journalCount}
+                                </div>
                                 <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Journal</div>
                             </div>
                         </div>

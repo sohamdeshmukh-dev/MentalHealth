@@ -83,9 +83,9 @@ export async function GET() {
     const relevantIds = [...new Set([...friendIds, user.id])];
 
     if (relevantIds.length > 0) {
-        // 1. Text Journals
+        // 1. Journal Entries
         const { data: textCounts } = await supabase
-            .from("mood_journal")
+            .from("journal_entries")
             .select("user_id")
             .in("user_id", relevantIds);
 

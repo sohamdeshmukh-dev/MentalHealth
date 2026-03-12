@@ -51,6 +51,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   text: string;
+  imageUrl?: string;
 }
 
 interface VoiceJournal {
@@ -158,6 +159,9 @@ function InkTypewriter({ text, speed = 26 }: { text: string; speed?: number }) {
 export default function AITherapistPage() {
   /* ─── State ─── */
   const [conversation, setConversation] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLiveCall, setIsLiveCall] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState<string>("");
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -240,9 +244,51 @@ export default function AITherapistPage() {
     }
   }, []);
 
+  // Fetch all previous chats when the page loads
+  const loadChatHistory = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+        .from('therapist_chats')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+    if (!error && data) setChatHistory(data);
+  }, []);
+
+  // Switch to an old chat
+  const openOldChat = useCallback((session: any) => {
+    setCurrentSessionId(session.id);
+    setConversation(session.messages || []); // Set the chat box to the old messages
+    setIsSidebarOpen(false); // Close sidebar on mobile
+  }, []);
+
+  // Start a fresh chat
+  const startNewChat = useCallback(() => {
+    setCurrentSessionId(null);
+    setConversation([INITIAL_MESSAGE]);
+    setIsSidebarOpen(false);
+  }, []);
+
+  // Delete a chat (Triggered by the slide-to-delete button)
+  const deleteChat = useCallback(async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevents the chat from opening when you click delete
+    await supabase.from('therapist_chats').delete().eq('id', id);
+    
+    // If they deleted the chat they are currently looking at, clear the screen
+    if (currentSessionId === id) {
+        startNewChat();
+    }
+    loadChatHistory(); // Refresh the sidebar
+  }, [currentSessionId, startNewChat, loadChatHistory]);
+
   /* ─── Fetch user + vault_pin + voice journals on load ─── */
   useEffect(() => {
     async function init() {
+      await loadChatHistory();
+      
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || '00000000-0000-0000-0000-000000000000';
       setUserId(currentUserId);
@@ -357,16 +403,23 @@ export default function AITherapistPage() {
 
         const updatedMessages = [...history, { role: "user", content: text }];
 
-        const res = await fetch("/api/chat", {
+        const res = await fetch("/api/therapist", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: updatedMessages }),
+          body: JSON.stringify({ 
+            message: text, 
+            history: history,
+            analyze: true, // Trigger mood analysis for art therapy
+            tts: false     // No need for voice synthesis on text chat
+          }),
         });
 
         let reply: string;
+        let imageUrl: string | undefined;
         if (res.ok) {
           const data = await res.json();
-          reply = data.message;
+          reply = data.reply;
+          imageUrl = data.imageUrl;
         } else {
           reply = AI_REFLECTIONS[Math.floor(Math.random() * AI_REFLECTIONS.length)];
         }
@@ -375,8 +428,36 @@ export default function AITherapistPage() {
           id: `ai-${Date.now()}`,
           role: "assistant",
           text: reply,
+          imageUrl: imageUrl,
         };
-        setConversation((c) => [...c, aiMsg]);
+        const nextConversation = [...conversation, userMsg, aiMsg];
+        setConversation(nextConversation);
+
+        // Auto-save logic
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (currentSessionId) {
+            // A. If we are in an existing chat, just update the JSON array
+            await supabase.from('therapist_chats')
+                .update({ messages: nextConversation, updated_at: new Date() })
+                .eq('id', currentSessionId);
+        } else if (user) {
+            // B. If this is a brand new chat, create a new row and generate a title
+            const chatTitle = text.substring(0, 25) + (text.length > 25 ? "..." : "");
+            const { data, error } = await supabase.from('therapist_chats')
+                .insert({
+                    user_id: user.id,
+                    title: chatTitle,
+                    messages: nextConversation
+                }).select().single();
+
+            if (data) {
+                setCurrentSessionId(data.id);
+            }
+        }
+
+        // Refresh the sidebar so the new message/title shows up!
+        loadChatHistory();
 
         if (voiceModeRef.current && recognitionRef.current) {
           try { recognitionRef.current.start(); } catch { /* ignore */ }
@@ -395,7 +476,7 @@ export default function AITherapistPage() {
         setIsThinking(false);
       }
     },
-    [conversation]
+    [conversation, currentSessionId, loadChatHistory]
   );
 
   /* ─── Recording logic ─── */
@@ -494,6 +575,7 @@ export default function AITherapistPage() {
                   id: `ai-voice-${Date.now()}`,
                   role: "assistant",
                   text: data.reply,
+                  imageUrl: data.imageUrl,
                 };
                 setConversation((c) => [...c, aiMsg]);
               }, 400);
@@ -1013,6 +1095,58 @@ export default function AITherapistPage() {
     <div className="min-h-screen bg-stone-900 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-stone-950 p-4 md:p-8 flex gap-4 md:gap-8 items-center justify-center"
       style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
     >
+      {/* SLIDING SIDEBAR OVERLAY */}
+      {isSidebarOpen && (
+          <div className="fixed inset-0 z-[10000] flex">
+              {/* Dark background click-to-close */}
+              <div 
+                  className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+                  onClick={() => setIsSidebarOpen(false)}
+              />
+
+              {/* The Sidebar panel */}
+              <div className="relative w-80 bg-[#faf9f5] border-r border-gray-200 h-full shadow-2xl p-4 flex flex-col transform transition-transform duration-300">
+                  <div className="flex justify-between items-center mb-6">
+                      <h2 className="font-serif text-xl text-gray-800 m-0">Past Sessions</h2>
+                      <button onClick={startNewChat} className="text-teal-600 hover:text-teal-700 bg-transparent border-0 cursor-pointer p-2 text-sm font-medium">
+                          + New Chat
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                      {chatHistory.map((chat) => (
+                          // THE SLIDE-TO-DELETE CONTAINER (Zero JS bugs, pure CSS translation)
+                          <div key={chat.id} className="group relative w-full h-14 overflow-hidden rounded-lg bg-gray-100 border border-gray-200">
+                              
+                              {/* The Delete Button (Hiding underneath) */}
+                              <button 
+                                  onClick={(e) => deleteChat(chat.id, e)}
+                                  className="absolute right-0 top-0 h-full cursor-pointer border-0 w-16 bg-red-500 flex items-center justify-center text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100"
+                              >
+                                  🗑️
+                              </button>
+
+                              {/* The Chat Button (Slides left on hover/touch) */}
+                              <div 
+                                  onClick={() => openOldChat(chat)}
+                                  className="absolute inset-0 bg-white p-3 flex flex-col justify-center cursor-pointer transition-transform duration-300 ease-out group-hover:-translate-x-16"
+                              >
+                                  <span className="text-sm font-medium text-gray-800 truncate block">{chat.title}</span>
+                                  <span className="text-xs text-gray-400 block">
+                                      {new Date(chat.updated_at || chat.created_at).toLocaleDateString()}
+                                  </span>
+                              </div>
+                          </div>
+                      ))}
+                      
+                      {chatHistory.length === 0 && (
+                          <p className="text-sm text-gray-400 text-center mt-10 italic">No past sessions found.</p>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* ═══════════════════════════════════════════
           LEFT SIDE — Typewriter Paper (Chat)
           ═══════════════════════════════════════════ */}
@@ -1029,6 +1163,13 @@ export default function AITherapistPage() {
 
         {/* Header */}
         <div className="relative z-10 mb-4 flex-shrink-0">
+          <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-2 transition"
+          >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              Chat History
+          </button>
           <p className="text-[10px] uppercase tracking-[3px] text-stone-400 mb-0.5" style={{ fontFamily: "Georgia, serif" }}>Session Notes</p>
           <h2 className="text-xl font-normal text-stone-700 tracking-wide" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
             The Therapist&apos;s Desk
@@ -1058,8 +1199,8 @@ export default function AITherapistPage() {
                 }>
                   <p className={
                     msg.role === "assistant"
-                      ? "font-mono text-slate-800 text-[13.5px] leading-relaxed tracking-tight m-0"
-                      : "text-stone-700 text-[13.5px] leading-relaxed m-0"
+                      ? "font-mono text-slate-800 text-[13.5px] leading-relaxed tracking-tight m-0 whitespace-pre-wrap"
+                      : "text-stone-700 text-[13.5px] leading-relaxed m-0 whitespace-pre-wrap"
                   }
                     style={msg.role === "user" ? { fontFamily: "'Inter', sans-serif" } : { fontFamily: "'Courier New', 'Courier', monospace" }}
                   >
@@ -1069,6 +1210,20 @@ export default function AITherapistPage() {
                       msg.text
                     )}
                   </p>
+                  
+                  {/* 🎨 The Art Therapy Image Renderer */}
+                  {msg.imageUrl && (
+                      <div className="mt-4 p-2 bg-white/50 rounded-xl border border-gray-200 shadow-sm">
+                          <span className="text-xs text-gray-400 font-medium mb-2 block uppercase tracking-widest">
+                              Visual Reflection
+                          </span>
+                          <img 
+                              src={msg.imageUrl} 
+                              alt="AI Art Therapy" 
+                              className="w-full h-auto rounded-lg object-cover"
+                          />
+                      </div>
+                  )}
                 </div>
               </motion.div>
             ))}

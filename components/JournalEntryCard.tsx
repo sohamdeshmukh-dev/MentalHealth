@@ -71,7 +71,7 @@ export default function JournalEntryCard({ entry, isDeleting, onDelete }: Journa
 
       {note ? (
         <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4">
-          <p className="text-sm leading-relaxed text-[var(--foreground)]">{noteToShow}</p>
+          <p className="text-sm leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">{noteToShow}</p>
           {isLongNote ? (
             <button
               type="button"

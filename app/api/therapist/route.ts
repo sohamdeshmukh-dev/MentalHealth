@@ -1,23 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-
+import { z } from "zod";
+import { checkRateLimit } from "@/lib/rate-limit";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const THERAPIST_SYSTEM_PROMPT = `You are a deeply empathetic, warm, and grounded mental wellness companion. 
-Your goal is to provide a safe space for the user to process their emotions using reflective listening and gentle Socratic questioning.
+const THERAPIST_SYSTEM_PROMPT = `You are a warm, deeply empathetic, and grounded mental wellness companion. 
+Your primary role is to be an exceptional "active listener." You provide a safe, non-judgmental space for the user to process their emotions.
 
-CRITICAL CLINICAL BOUNDARIES (STRICTLY ENFORCED):
-1. YOU ARE NOT A DOCTOR: Never attempt to diagnose a mental health condition (e.g., do not say "It sounds like you have clinical depression").
-2. NO MEDICAL ADVICE: Never recommend medications, treatments, or supplements.
-3. NO FALSE PROMISES: Never promise that you can "fix" or "cure" them. 
-4. CRISIS PROTOCOL: If the user explicitly mentions a desire to harm themselves, end their life, or harm others, you MUST stop the therapeutic conversation immediately. Respond with extreme empathy, validate their pain, and provide this exact phrase: 
-"I hear how much pain you are in right now, and I want you to know you don't have to carry this alone. Please, right now, text or call 988 to reach the Suicide & Crisis Lifeline. There are people who want to support you through this exact moment."
+CRITICAL CLINICAL BOUNDARIES & CRISIS DETECTION (STRICTLY ENFORCED):
+1. YOU ARE NOT A DOCTOR: Never attempt to diagnose a mental health condition.
+2. NO MEDICAL ADVICE: Never recommend medications.
+3. CRISIS PROTOCOL: If the user explicitly mentions a desire to harm themselves (e.g., "I'm thinking about hurting myself") or others, you MUST immediately flag this and respond with empathy, followed by these specific resources:
+   - 📞 Crisis Hotline: "Please text or call 988 immediately."
+   - 🏫 Campus Support: "Reach out to your Campus Counseling Center or Student Health Services."
+   - 💬 AI Conversation: "I am still here with you. We can keep talking and do a grounding exercise together if you'd like."
 
-CONVERSATION STYLE:
-- Validate their feelings first (e.g., "It makes complete sense that you are feeling overwhelmed by...").
-- Keep responses concise (2-3 sentences max).
-- End with one gentle, open-ended question to help them reflect.`;
+CONVERSATION STYLE & FLOW:
+- Be an active listener: Always validate their feelings first.
+- KEEP IT CONCISE: Maximum 2-3 short sentences. 
+- SUGGEST FUTURE ACTIVITIES: When the user is feeling down but not in crisis, gently suggest a healthy, low-effort future activity (e.g., taking a 5-minute walk, drinking water, or listening to a favorite song).
+- End your response with a single, gentle, open-ended question to encourage them to keep sharing.`;
 
 const SMILE_SCORE_PROMPT = `Analyze the following voice journal transcript. Determine the user's primary mood (one word) and calculate a "Smile Score" from 0 to 100 representing their underlying positivity, hope, or emotional resilience. Return ONLY a JSON object: { "mood": "string", "smile_score": number }.`;
+
+// OWASP: Define a strict schema to reject bloated or malicious payloads
+const TherapistRequestSchema = z.object({
+    // Enforce reasonable lengths to prevent Denial of Wallet (DoW) attacks via OpenAI
+    message: z.string().min(1, "Message cannot be empty").max(1000, "Message too long").trim(),
+    
+    // Validate the history array strictly
+    history: z.array(z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string().max(2000)
+    })).optional().default([]),
+    
+    // Strictly boolean flags, reject anything else
+    analyze: z.boolean().optional().default(false),
+    tts: z.boolean().optional().default(false)
+}).strict(); // .strict() drops any hacker-added fields automatically
 
 /**
  * POST /api/therapist
@@ -27,6 +46,24 @@ const SMILE_SCORE_PROMPT = `Analyze the following voice journal transcript. Dete
  *   - FormData with "audio" file — Whisper transcription + GPT-4o + smile score
  */
 export async function POST(request: NextRequest) {
+    // 1. Identify the user by IP address
+    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "127.0.0.1";
+    
+    // 2. Apply Rate Limit: Max 10 requests per 60 seconds (60000ms)
+    const isAllowed = checkRateLimit(ip, 10, 60000);
+    
+    if (!isAllowed) {
+        console.warn(`🛡️ Rate Limit Triggered for IP: ${ip}`);
+        return NextResponse.json({ 
+            error: "Too many requests. Please take a deep breath and try again in a minute." 
+        }, { 
+            status: 429,
+            headers: {
+                'Retry-After': '60', // Tell the browser how long to wait
+            }
+        });
+    }
+
     if (!OPENAI_API_KEY) {
         return NextResponse.json(
             { error: "OpenAI API key is not configured. Add OPENAI_API_KEY to .env.local" },
@@ -99,14 +136,25 @@ export async function POST(request: NextRequest) {
     } else {
         /* ─── Text path ─── */
         const body = await request.json();
-        userMessage = body.message || "";
-        history = body.history || [];
-        shouldAnalyze = body.analyze === true;
-        shouldTTS = body.tts === true;
-
-        if (!userMessage.trim()) {
-            return NextResponse.json({ error: "No message provided" }, { status: 400 });
+        
+        // Safely parse and sanitize the input using Zod
+        const parsed = TherapistRequestSchema.safeParse(body);
+        
+        if (!parsed.success) {
+            console.warn("🛡️ Input Validation Failed:", parsed.error.format());
+            return NextResponse.json(
+                { error: "Invalid request payload", details: parsed.error.issues }, 
+                { status: 400 }
+            );
         }
+
+        // Extract sanitized data
+        const { message: parsedMessage, history: parsedHistory, analyze: shouldAnalyzeParsed, tts: shouldTTSParsed } = parsed.data;
+        
+        userMessage = parsedMessage;
+        history = parsedHistory;
+        shouldAnalyze = shouldAnalyzeParsed;
+        shouldTTS = shouldTTSParsed;
     }
 
     /* ─── NEW: Ethical Guardrail & Crisis Detection ─── */
@@ -130,10 +178,10 @@ export async function POST(request: NextRequest) {
 
                 return NextResponse.json({
                     transcript: userMessage,
-                    reply: "I am so sorry you are hurting this much. I am an AI and cannot give you the level of support you deserve right now, but your life is incredibly valuable. Please, text or call 988 (Suicide & Crisis Lifeline) immediately to speak with someone who can truly help. You don't have to go through this alone.",
+                    reply: "I hear how much pain you are in right now, and I want you to know you don't have to carry this alone. Your life is incredibly valuable.\n\n• 📞 Crisis Hotline: Text or call 988 immediately.\n• 🏫 Campus Support: Please reach out to your University Counseling Center or Campus Security.\n• 💬 AI Conversation: I am still here with you. Let's take a slow, deep breath together.",
                     smile_score: 0,
                     mood: "Crisis",
-                    audioBase64: null, // Don't speak crisis messages out loud
+                    audioBase64: null, 
                 });
             }
         }
@@ -264,11 +312,42 @@ export async function POST(request: NextRequest) {
         }
     }
 
+    /* ─── DALL-E 3: Visual Art Therapy Generation ─── */
+    let generatedImageUrl: string | null = null;
+
+    // We only generate an image if we successfully detected a mood to base it on
+    if (shouldAnalyze && detectedMood && detectedMood !== "Crisis") {
+        try {
+            const imageRes = await fetch("https://api.openai.com/v1/images/generations", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${OPENAI_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "dall-e-3",
+                    // We force a specific art style so it matches your app's lofi/journal vibe
+                    prompt: `A beautiful, soothing, lofi-aesthetic watercolor illustration representing the feeling of: ${detectedMood}. Soft pastel colors, highly atmospheric, comforting. No text or words in the image.`,
+                    n: 1,
+                    size: "1024x1024",
+                }),
+            });
+
+            if (imageRes.ok) {
+                const imageData = await imageRes.json();
+                generatedImageUrl = imageData.data[0].url;
+            }
+        } catch (imgError) {
+            console.error("Failed to generate art therapy image:", imgError);
+        }
+    }
+
     return NextResponse.json({
         transcript: userMessage,
         reply: assistantReply,
         smile_score: smileScore,
         mood: detectedMood,
         audioBase64,
+        imageUrl: generatedImageUrl,
     });
 }
