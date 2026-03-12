@@ -177,5 +177,14 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+
+  // Update latest_mood on profile
+  if (user?.id) {
+    await supabase.from("profiles").update({
+      latest_mood: entry.mood,
+      latest_mood_updated_at: new Date().toISOString()
+    }).eq("id", user.id);
+  }
+
   return NextResponse.json(entry, { status: 201 });
 }

@@ -112,8 +112,8 @@ export default function FriendsPage() {
                 .select(`
                     id,
                     status,
-                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code, total_journals),
-                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code, total_journals)
+                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends),
+                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends)
                 `)
                 .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                 .eq('status', 'accepted');
@@ -125,8 +125,8 @@ export default function FriendsPage() {
                     .select(`
                         id,
                         status,
-                        sender:user_id (id, display_name, avatar_url, unique_code, total_journals),
-                        receiver:friend_id (id, display_name, avatar_url, unique_code, total_journals)
+                        sender:user_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends),
+                        receiver:friend_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends)
                     `)
                     .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                     .eq('status', 'accepted');
@@ -642,7 +642,14 @@ export default function FriendsPage() {
                                                     {friend.profile?.display_name && (
                                                         <p className="text-[11px] text-slate-400">#{friend.profile?.unique_code}</p>
                                                     )}
-                                                    <div className="text-[11px] flex items-center gap-1 text-emerald-400/80 font-medium">
+                                                    {friend.profile?.share_mood_with_friends && friend.profile?.latest_mood && (
+                                                        <div className="mt-1 flex items-center">
+                                                            <span className="inline-flex items-center rounded-full bg-teal-500/10 px-2.5 py-0.5 text-[10px] font-medium text-teal-400 border border-teal-500/20">
+                                                                Feeling: {friend.profile.latest_mood}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="text-[11px] flex items-center gap-1 text-emerald-400/80 font-medium mt-1">
                                                         <BookOpen className="w-3 h-3" />
                                                         {friend.entry_count} entries
                                                     </div>

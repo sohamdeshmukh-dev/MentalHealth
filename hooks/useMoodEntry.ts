@@ -175,6 +175,15 @@ export function useMoodEntry() {
           throw new Error(lastErrorMessage);
         }
 
+        // Update profiles with latest mood
+        await supabase
+          .from("profiles")
+          .update({ 
+            latest_mood: fullPayload.mood,
+            latest_mood_updated_at: new Date().toISOString()
+          })
+          .eq("id", user.id);
+
         const mapped = mapJournalEntryFromDb(inserted);
         setEntries((current) => [mapped, ...current]);
 
