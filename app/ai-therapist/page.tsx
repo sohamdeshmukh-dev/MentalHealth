@@ -1106,10 +1106,9 @@ export default function AITherapistPage() {
 
       {/* The Sidebar panel */}
       <div className={`
-          fixed bg-[#faf9f5] transition-transform duration-300
-          inset-0 z-[10000] flex flex-col p-4
-          md:inset-y-0 md:left-0 md:right-auto md:w-80 md:border-r border-gray-200 shadow-2xl
-          ${isSidebarOpen ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:-translate-x-full'}
+          fixed inset-y-0 right-0 w-80 bg-[#faf9f5] transition-transform duration-300
+          z-[10000] flex flex-col p-4 border-l border-gray-200 shadow-2xl
+          ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
       `}>
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="font-serif text-xl text-gray-800 m-0">Past Sessions</h2>

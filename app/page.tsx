@@ -25,6 +25,9 @@ export default function Home() {
   const [cityColleges, setCityColleges] = useState<College[]>([]);
   const [campusInsights, setCampusInsights] = useState<CampusEmotionResponse | null>(null);
 
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
   const didAutoCenterRef = useRef(false);
   const city = CITIES[cityIndex];
 
@@ -151,6 +154,19 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
+  const handleSeedSpaces = useCallback(async () => {
+    setIsSeeding(true);
+    try {
+      const { seedRealSafeSpaces } = await import("@/utils/seedSafeSpaces");
+      await seedRealSafeSpaces();
+      await fetchCheckins();
+    } catch (err) {
+      console.error("Failed to seed safe spaces:", err);
+    } finally {
+      setIsSeeding(false);
+    }
+  }, [fetchCheckins]);
+
   const effectiveCampusName = registeredCollege?.name ?? checkins.find((checkin) => checkin.campus_name)?.campus_name;
 
   // Generate deterministic seed points for the current city so weather
@@ -196,60 +212,71 @@ export default function Home() {
   }, [checkins, isCampusMode, registeredCollege?.id, registeredCollege?.name, timeFilter, seedPoints]);
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-[var(--background)] p-2 sm:p-4">
-      <div className="relative h-full w-full overflow-hidden rounded-[26px] border border-[var(--border-soft)] shadow-2xl sm:rounded-[32px]">
-        <Map3DView
-          checkins={filteredCheckins}
-          city={city}
-          focusedCampus={isCampusMode ? effectiveCampusName : undefined}
-          campuses={cityColleges}
-          registeredCollege={registeredCollege}
-          campusInsights={campusInsights}
-          focusRegisteredCampus={isCampusMode}
-        />
+    <div className="relative w-full h-screen overflow-hidden bg-black">
+      <Map3DView
+        checkins={filteredCheckins}
+        city={city}
+        focusedCampus={isCampusMode ? effectiveCampusName : undefined}
+        campuses={cityColleges}
+        registeredCollege={registeredCollege}
+        campusInsights={campusInsights}
+        focusRegisteredCampus={isCampusMode}
+        onToggleSpin={setIsSpinning}
+        isSeeding={isSeeding}
+        onSeedSafeSpaces={handleSeedSpaces}
+      />
 
-        {/* TOP BAR (Location Search) */}
-        <div className="pointer-events-auto absolute left-1/2 top-2 z-[40] -translate-x-1/2 sm:top-5">
+      {/* ✅ Top Center: Location Search */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 text-center">
+        <div className="flex flex-col items-center">
           <CityNavigator currentIndex={cityIndex} onNavigate={setCityIndex} />
         </div>
+      </div>
 
-        {/* BOTTOM ACTION BAR (Filters & Tools) */}
-        <div className="pointer-events-none absolute bottom-0 left-0 z-[50] w-full p-2 sm:p-4">
-          <div className="pointer-events-auto mx-auto flex w-full max-w-md flex-col gap-3 rounded-2xl bg-black/60 p-3 shadow-2xl backdrop-blur-xl sm:rounded-3xl sm:p-4">
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {["All", "Morning", "Afternoon", "Evening", "Night"].map((filterName) => (
-                <button
-                  key={filterName}
-                  onClick={() => setTimeFilter(filterName)}
-                  className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold tracking-wide transition-colors ${timeFilter === filterName
-                    ? "bg-[var(--accent)] text-white shadow"
-                    : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
-                    }`}
-                >
-                  {filterName}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="origin-left scale-[0.65] sm:scale-75">
-                <LocalClock selectedCity={city.name} selectedState={city.state} />
-              </div>
-
-              {effectiveCampusName && (
-                <button
-                  onClick={() => setIsCampusMode((value) => !value)}
-                  className={`rounded-full border px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-colors ${isCampusMode
-                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
-                    : "border-white/10 bg-white/10 text-white/90 hover:bg-white/20"
-                    }`}
-                >
-                  🎓 {effectiveCampusName}
-                </button>
-              )}
-            </div>
-          </div>
+      {/* ✅ Bottom Left: Filters and Time */}
+      <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-4">
+        <div className="flex gap-2">
+          {["All", "Morning", "Afternoon", "Evening", "Night"].map((filterName) => (
+            <button
+              key={filterName}
+              onClick={() => setTimeFilter(filterName)}
+              className={`px-4 py-1 rounded-full text-sm transition-all duration-300 ${timeFilter === filterName
+                ? "bg-teal-500 shadow-[0_0_12px_rgba(20,184,166,0.4)]"
+                : "bg-black/50 text-white hover:bg-black/70"
+                }`}
+            >
+              {filterName}
+            </button>
+          ))}
         </div>
+        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 w-64 border border-gray-700/50 shadow-2xl">
+          <LocalClock selectedCity={city.name} selectedState={city.state} />
+        </div>
+      </div>
+
+      {/* ✅ Bottom Right: Tools */}
+      <div className="absolute bottom-20 right-4 z-40 flex flex-col gap-2 items-end">
+        {effectiveCampusName && (
+          <button
+            onClick={() => setIsCampusMode((value) => !value)}
+            className={`text-sm bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-black/90 transition shadow-lg ${isCampusMode ? "text-emerald-400 border-emerald-500/30" : "text-white"}`}
+          >
+            🎓 {effectiveCampusName}
+          </button>
+        )}
+        <button 
+          className="text-teal-400 text-sm bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-black/90 transition shadow-lg disabled:opacity-50"
+          onClick={handleSeedSpaces}
+          disabled={isSeeding}
+        >
+          {isSeeding ? "🌿 Seeding..." : "🌿 Seed Safe Spaces"}
+        </button>
+        <button 
+          className={`text-sm bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-black/90 transition shadow-lg ${isSpinning ? "text-blue-400 border-blue-500/30" : "text-white"}`}
+          onClick={() => setIsSpinning(!isSpinning)}
+        >
+          {isSpinning ? "⏸ Stop" : "🔄 Cinematic"}
+        </button>
       </div>
     </div>
   );

@@ -35,6 +35,9 @@ interface Map3DViewProps {
   registeredCollege?: College | null;
   campusInsights?: CampusEmotionResponse | null;
   focusRegisteredCampus?: boolean;
+  onToggleSpin?: (isSpinning: boolean) => void;
+  onSeedSafeSpaces?: () => Promise<void>;
+  isSeeding?: boolean;
 }
 
 export default function Map3DView({
@@ -46,6 +49,9 @@ export default function Map3DView({
   registeredCollege = null,
   campusInsights = null,
   focusRegisteredCampus = false,
+  onToggleSpin,
+  onSeedSafeSpaces,
+  isSeeding = false,
 }: Map3DViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -83,7 +89,7 @@ export default function Map3DView({
       attributionControl: false,
     });
 
-    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     map.on("style.load", () => {
       // ── Terrain ──────────────────────────────────────────────
@@ -133,7 +139,7 @@ export default function Map3DView({
       // ── 3D buildings ─────────────────────────────────────────
       const layers = map.getStyle().layers;
       const labelLayerId = layers?.find(
-        (l) => l.type === "symbol" && l.layout?.["text-field"]
+        (l: any) => l.type === "symbol" && l.layout?.["text-field"]
       )?.id;
 
       const add3DBuildings = () => {
@@ -429,6 +435,10 @@ export default function Map3DView({
 
   // ── Cinematic Auto-Spin (ADDITIVE / ISOLATED) ──
   useEffect(() => {
+    if (onToggleSpin) {
+      onToggleSpin(isSpinning);
+    }
+
     if (!isSpinning || !mapRef.current) {
       if (spinFrameRef.current) {
         cancelAnimationFrame(spinFrameRef.current);
@@ -450,7 +460,7 @@ export default function Map3DView({
         spinFrameRef.current = null;
       }
     };
-  }, [isSpinning]);
+  }, [isSpinning, onToggleSpin]);
 
   // ── Safe Spaces: Native WebGL layers (zero-drift, ADDITIVE / ISOLATED) ──
 
@@ -666,59 +676,6 @@ export default function Map3DView({
           onAdded={() => safeSpacesRefetchRef.current()}
         />
       )}
-
-      {/* Cinematic Spin Toggle */}
-      <button
-        onClick={() => setIsSpinning((s) => !s)}
-        style={{
-          position: "absolute",
-          bottom: 130,
-          right: 16,
-          zIndex: 10,
-          padding: "8px 14px",
-          borderRadius: 9999,
-          border: isSpinning ? "1px solid rgba(129,140,248,0.6)" : "1px solid rgba(100,116,139,0.4)",
-          background: isSpinning ? "rgba(99,102,241,0.25)" : "rgba(15,23,42,0.85)",
-          color: isSpinning ? "#a5b4fc" : "#94a3b8",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-          backdropFilter: "blur(12px)",
-          transition: "all 0.2s ease",
-        }}
-      >
-        {isSpinning ? "⏸ Stop" : "🔄 Cinematic"}
-      </button>
-
-      {/* Seed Safe Spaces Button */}
-      <button
-        onClick={async () => {
-          setIsSeedingSpaces(true);
-          await seedRealSafeSpaces();
-          fetchAndRenderSafeSpaces();
-          setIsSeedingSpaces(false);
-        }}
-        disabled={isSeedingSpaces}
-        style={{
-          position: "absolute",
-          bottom: 170,
-          right: 16,
-          zIndex: 10,
-          padding: "8px 14px",
-          borderRadius: 9999,
-          border: "1px solid rgba(52,211,153,0.4)",
-          background: "rgba(15,23,42,0.85)",
-          color: isSeedingSpaces ? "#6ee7b7" : "#34d399",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: isSeedingSpaces ? "not-allowed" : "pointer",
-          backdropFilter: "blur(12px)",
-          transition: "all 0.2s ease",
-          opacity: isSeedingSpaces ? 0.6 : 1,
-        }}
-      >
-        {isSeedingSpaces ? "Seeding..." : "🌿 Seed Safe Spaces"}
-      </button>
     </>
   );
 }

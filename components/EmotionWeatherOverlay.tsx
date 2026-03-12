@@ -947,8 +947,18 @@ export default function EmotionWeatherOverlay({
 
   /* ── AR Mode 3D Layer ────────────────────────────────────────── */
   useEffect(() => {
+    // 1. Check if map exists
     if (!map) return;
 
+    // 2. NEW: Ensure the map's style is fully loaded before querying layers
+    if (!map.isStyleLoaded()) {
+        // Optional: If your layers aren't showing up after fixing the crash, 
+        // you can force it to wait and run your logic once the style loads:
+        // map.once('styledata', () => { /* your layer logic here */ });
+        return; 
+    }
+
+    // 3. Now it is completely safe to check for layers!
     if (!map.getLayer('3d-buildings-ar')) {
       // Calculate overall average smile score
       const avgSmile = checkins.length > 0 
@@ -1037,6 +1047,10 @@ export default function EmotionWeatherOverlay({
 
     const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
       if (!isARMode) return;
+      
+      // 🛡️ ADD THIS SAFETY CHECK: 
+      // Only query the layer if it actually exists on the map right now!
+      if (!map.getLayer('3d-buildings-ar')) return;
       
       const features = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings-ar'] });
       if (features.length > 0) {

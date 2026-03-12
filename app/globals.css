@@ -1031,3 +1031,8 @@ html {
     font-size: 18px;
   }
 }
+
+/* This forces any Mapbox/MapLibre controls in the bottom right to move up! */
+.mapboxgl-ctrl-bottom-right {
+    bottom: 80px !important; 
+}
