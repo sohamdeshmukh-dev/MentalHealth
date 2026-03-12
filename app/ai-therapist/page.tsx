@@ -43,6 +43,7 @@ interface SpeechRecognitionAlternative {
 import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { toast as hotToast } from "react-hot-toast";
 
 /* ═══════════════════════════════════════════════════════════════════
    TYPES
@@ -771,14 +772,43 @@ export default function AITherapistPage() {
   };
 
   /* ─── Delete / Rename ─── */
-  const handleDeleteTape = useCallback(async (tape: VoiceJournal) => {
-    if (!window.confirm('Are you sure you want to burn this tape?')) return;
-    const { error } = await supabase.from('voice_journals').delete().eq('id', tape.id);
-    if (error) {
-      alert("Failed to delete tape: " + error.message);
-    } else {
-      await fetchJournals(userId || '00000000-0000-0000-0000-000000000000');
-    }
+  const handleDeleteTape = useCallback((tape: VoiceJournal) => {
+    // 1. Immediately hide it from the UI (Optimistic update)
+    setJournals((prev) => prev.filter((t) => t.id !== tape.id));
+
+    // 2. Schedule actual deletion
+    const timeoutId = setTimeout(async () => {
+      const { error } = await supabase.from('voice_journals').delete().eq('id', tape.id);
+      if (error) {
+        console.error("Failed to delete tape", error);
+        // Put it back in the UI on error
+        fetchJournals(userId || '00000000-0000-0000-0000-000000000000');
+      }
+    }, 4000);
+
+    // 3. Show a custom toast with an Undo button
+    hotToast(
+      (t: { id: string }) => (
+        <div className="flex items-center gap-4 text-sm">
+          <span>Tape moved to trash.</span>
+          <button
+            onClick={() => {
+              clearTimeout(timeoutId);
+              hotToast.dismiss(t.id);
+              // Put it back in the UI!
+              fetchJournals(userId || '00000000-0000-0000-0000-000000000000');
+            }}
+            className="text-teal-400 font-bold hover:text-teal-300"
+          >
+            UNDO
+          </button>
+        </div>
+      ),
+      {
+        duration: 4000,
+        style: { background: '#333', color: '#fff' },
+      }
+    );
   }, [userId, fetchJournals]);
 
   const handleRenameTape = useCallback(async (tape: VoiceJournal) => {

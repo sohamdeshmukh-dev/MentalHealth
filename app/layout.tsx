@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import ThemeProvider from "@/components/ThemeProvider";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -26,6 +27,7 @@ export default function RootLayout({
         className={`${inter.variable} antialiased bg-[var(--background)] text-[var(--foreground)] font-[family-name:var(--font-inter)]`}
       >
         <ThemeProvider>
+          <Toaster position="bottom-center" />
           <Navbar />
           <main>
             {children}

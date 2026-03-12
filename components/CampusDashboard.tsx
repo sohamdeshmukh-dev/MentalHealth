@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import toast from "react-hot-toast";
 import {
   CartesianGrid,
   Line,
@@ -144,6 +146,64 @@ export default function CampusDashboard({ college, campusInsights, journalEntrie
       user_checkins: point.user_checkins,
     }));
   }, [campusInsights?.trend_data, userTrend.points]);
+
+  // --- Phase 3: Classmates List ---
+  const [classmates, setClassmates] = useState<any[]>([]);
+  const [loadingClassmates, setLoadingClassmates] = useState(false);
+
+  useEffect(() => {
+    const fetchClassmates = async () => {
+      setLoadingClassmates(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingClassmates(false); return; }
+      
+      const { data: myProfile } = await supabase
+          .from('profiles')
+          .select('university_name, major, grade_level, is_student')
+          .eq('id', user.id)
+          .single();
+
+      if (!myProfile?.is_student || !myProfile?.university_name) {
+          setLoadingClassmates(false);
+          return;
+      }
+
+      const { data: peers } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, major, grade_level, latest_mood')
+          .eq('university_name', myProfile.university_name)
+          .eq('major', myProfile.major)
+          .neq('id', user.id)
+          .limit(20);
+
+      if (peers) {
+          setClassmates(peers);
+      }
+      setLoadingClassmates(false);
+    };
+
+    fetchClassmates();
+  }, [college]);
+
+  // --- Phase 4: Add Friend ---
+  const handleAddFriend = async (peerId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+          .from('friendships')
+          .insert({
+              user_id: user.id,
+              friend_id: peerId,
+              status: 'pending'
+          });
+
+      if (error) {
+          toast.error("Failed to send request");
+      } else {
+          toast.success("Friend request sent!");
+      }
+  };
 
   if (!college) {
     return (
@@ -321,6 +381,44 @@ export default function CampusDashboard({ college, campusInsights, journalEntrie
                   ))}
               </div>
             </div>
+          </div>
+
+          {/* Phase 3 & 4 UI: Classmates List */}
+          <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+             <h3 className="text-sm font-semibold text-slate-200">Meet Like-Minded Peers</h3>
+             <p className="mt-1 text-xs text-slate-400">Classmates in your major</p>
+
+             {loadingClassmates ? (
+                <p className="mt-4 text-xs text-slate-500">Looking for peers...</p>
+             ) : classmates.length === 0 ? (
+                <p className="mt-4 text-xs text-slate-500">No peers found in your exact major yet! Invite some friends.</p>
+             ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                   {classmates.map(peer => (
+                      <div key={peer.id} className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-slate-900/50 p-3">
+                         <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-lg">
+                               {peer.avatar_url ? (
+                                  <img src={peer.avatar_url} alt="avatar" className="h-10 w-10 rounded-full object-cover" />
+                               ) : (
+                                  "🎓"
+                               )}
+                            </div>
+                            <div>
+                               <p className="text-sm font-medium text-slate-200">{peer.full_name || "Anonymous Student"}</p>
+                               <p className="text-[10px] text-slate-400">{peer.grade_level} • {peer.major}</p>
+                            </div>
+                         </div>
+                         <button 
+                            onClick={() => handleAddFriend(peer.id)}
+                            className="rounded-lg bg-teal-500/20 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-500/30 transition"
+                         >
+                            Add Friend
+                         </button>
+                      </div>
+                   ))}
+                </div>
+             )}
           </div>
         </>
       )}

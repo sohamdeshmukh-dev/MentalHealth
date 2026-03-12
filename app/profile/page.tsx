@@ -146,14 +146,16 @@ export default function ProfilePage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { error } = await supabase
+            const { data: updatedProfile, error } = await supabase
                 .from('profiles')
                 .update(updates)
-                .eq('id', user.id);
+                .eq('id', user.id)
+                .select()
+                .single();
 
             if (error) throw error;
 
-            setProfile((prev: any) => ({ ...prev, ...updates }));
+            setProfile(updatedProfile);
         } catch (err: any) {
             console.error("Error updating profile:", err);
         }
@@ -319,17 +321,22 @@ export default function ProfilePage() {
                 grade: grade ?? null 
             };
 
-            const { error } = await supabase
+            // 🛡️ Added .select().single() to force Supabase to return the row.
+            // If RLS blocks the update, this will now throw a catchable error.
+            const { data: updatedProfile, error } = await supabase
                 .from("profiles")
                 .update(updates)
-                .eq("id", user.id);
+                .eq("id", user.id)
+                .select()
+                .single();
 
             if (error) {
                 console.error("Supabase Save Error:", error.message, error.details);
                 throw new Error(error.message);
             }
 
-            setProfile((prev: any) => ({ ...prev, ...updates }));
+            // 🔄 Instantly sync local profile state
+            setProfile(updatedProfile);
 
             if (collegeId) {
                 const { data: selectedCollege, error: collegeError } = await supabase

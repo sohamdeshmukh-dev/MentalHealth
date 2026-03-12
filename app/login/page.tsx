@@ -29,8 +29,15 @@ export default function LoginPage() {
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
+                // Check if this session was just created via signup
+                const isSignupRedirect = window.sessionStorage.getItem('pending_onboarding') === 'true';
+                if (isSignupRedirect) {
+                    window.sessionStorage.removeItem('pending_onboarding');
+                    router.push('/onboarding');
+                } else {
+                    router.push('/');
+                }
                 router.refresh();
-                router.push('/');
             }
         });
 
@@ -47,8 +54,12 @@ export default function LoginPage() {
         setLoading(true);
         try {
             if (isSignUp) {
+                window.sessionStorage.setItem('pending_onboarding', 'true');
                 const { data, error } = await supabase.auth.signUp({ email, password });
-                if (error) throw error;
+                if (error) {
+                    window.sessionStorage.removeItem('pending_onboarding');
+                    throw error;
+                }
                 if (data?.user) {
                     const newId = generatePatientId();
 
