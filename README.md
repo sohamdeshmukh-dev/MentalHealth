@@ -175,6 +175,8 @@ Watch emotional patterns shift.
 ✅24) Add some financial features for Capital One ( Ask AI for ideas)
 
 ✅25) IOS chat integration into the friends tab
+
+26) Security measures:  Adding Rate limiting on all public endpoints(IP+user-based, sensible defaults, graceful 429s), Strict Input Validation & Sanitization on all user inputs(schema-based, type checks, length limits, reject unexpected fields), Secure API key handling( remove hardcoded keys, move to enviormental variables, rotate keys, ensure no keys are exposed to client side) Follow OWASP best practices, include clear comments, and do not break existing functionality.
     
 
 1. Emotion Trails (Your Emotional Footprint)
