@@ -303,30 +303,50 @@ export default function ProfilePage() {
     };
 
     async function handleCollegeSave(collegeId: string | null, city: string, major: string | null, grade: string | null) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.error("No user found in handleCollegeSave");
+                return;
+            }
 
-        const updates: Record<string, unknown> = { college_id: collegeId, city, major: major ?? null, grade: grade ?? null };
+            const updates: Record<string, unknown> = { 
+                college_id: collegeId, 
+                city, 
+                major: major ?? null, 
+                grade: grade ?? null 
+            };
 
-        const { error } = await supabase
-            .from("profiles")
-            .update(updates)
-            .eq("id", user.id);
+            const { error } = await supabase
+                .from("profiles")
+                .update(updates)
+                .eq("id", user.id);
 
-        if (error) throw error;
+            if (error) {
+                console.error("Supabase Save Error:", error.message, error.details);
+                throw new Error(error.message);
+            }
 
-        setProfile((prev: any) => ({ ...prev, ...updates }));
+            setProfile((prev: any) => ({ ...prev, ...updates }));
 
-        if (collegeId) {
-            const { data: selectedCollege } = await supabase
-                .from("colleges")
-                .select("id, name, city, latitude, longitude, campus_radius")
-                .eq("id", collegeId)
-                .single();
-            setCollege((selectedCollege as College) ?? null);
-        } else {
-            setCollege(null);
-            setCampusInsights(null);
+            if (collegeId) {
+                const { data: selectedCollege, error: collegeError } = await supabase
+                    .from("colleges")
+                    .select("id, name, city, latitude, longitude, campus_radius")
+                    .eq("id", collegeId)
+                    .single();
+                
+                if (collegeError) {
+                    console.error("Error fetching college details:", collegeError.message);
+                }
+                setCollege((selectedCollege as College) ?? null);
+            } else {
+                setCollege(null);
+                setCampusInsights(null);
+            }
+        } catch (err: any) {
+            console.error("Failed to save college in ProfilePage:", err.message || err);
+            throw err; // Re-throw to be caught by CollegePicker's catch block
         }
     }
 

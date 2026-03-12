@@ -158,6 +158,9 @@ function InkTypewriter({ text, speed = 26 }: { text: string; speed?: number }) {
 export default function AITherapistPage() {
   /* ─── State ─── */
   const [conversation, setConversation] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [isLiveCall, setIsLiveCall] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState<string>("");
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [pinCode, setPinCode] = useState(["", "", "", ""]);
   const [pinError, setPinError] = useState(false);
@@ -226,6 +229,7 @@ export default function AITherapistPage() {
       const withUrls = await Promise.all(
         vj.map(async (j: VoiceJournal) => {
           if (j.audio_url.startsWith("http")) return j;
+          if (j.audio_url === "live-session-no-audio") return j;
           const { data } = await supabase.storage
             .from("voice-journals")
             .createSignedUrl(j.audio_url, 3600);
@@ -856,6 +860,152 @@ export default function AITherapistPage() {
   const publicTapes = journals.filter((j) => !j.is_vaulted);
   const vaultedTapes = journals.filter((j) => j.is_vaulted);
 
+  const startLiveTherapy = async () => {
+      try {
+          setIsLiveCall(true);
+
+          // 1. Get the secure ephemeral token from our new backend route
+          const tokenResponse = await fetch("/api/therapist/session", { method: "POST" });
+          const data = await tokenResponse.json();
+          
+          if (!data.client_secret?.value) {
+              throw new Error("Failed to get session token");
+          }
+          const EPHEMERAL_KEY = data.client_secret.value;
+
+          // 2. Set up the WebRTC Connection
+          const pc = new RTCPeerConnection();
+          peerConnection.current = pc;
+
+          // 3. Play the AI's audio automatically through a hidden audio element
+          const audioEl = document.createElement("audio");
+          audioEl.autoplay = true;
+          pc.ontrack = (e) => {
+              audioEl.srcObject = e.streams[0];
+          };
+
+          // 4. Capture the User's Microphone and send it to the AI
+          const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+          pc.addTrack(ms.getTracks()[0]);
+
+          // 5. Handshake with OpenAI's Realtime Server
+          
+          // --- ADD THIS DATA CHANNEL CODE ---
+          const dc = pc.createDataChannel("oai-events");
+          dc.addEventListener("message", (e) => {
+              const realtimeEvent = JSON.parse(e.data);
+              
+              // 1. When the AI finishes a sentence, add it to our transcript
+              if (realtimeEvent.type === "response.audio_transcript.done") {
+                  setLiveTranscript(prev => prev + "\n\nTherapist: " + realtimeEvent.transcript);
+              }
+              
+              // 2. When the User finishes speaking, add it to our transcript
+              if (realtimeEvent.type === "conversation.item.input_audio_transcription.completed") {
+                  setLiveTranscript(prev => prev + "\n\nMe: " + realtimeEvent.transcript);
+              }
+          });
+          // ----------------------------------
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          const baseUrl = "https://api.openai.com/v1/realtime";
+          const model = "gpt-realtime"; // The high-speed voice model
+          
+          const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+              method: "POST",
+              body: offer.sdp,
+              headers: {
+                  Authorization: `Bearer ${EPHEMERAL_KEY}`,
+                  "Content-Type": "application/sdp",
+              },
+          });
+
+          // 1. Check if the API actually succeeded
+          if (!sdpResponse.ok) {
+               throw new Error("OpenAI WebRTC connection failed.");
+          }
+
+          // 2. SAFETY CHECK: Did the user close the connection while we were waiting?
+          if (pc.signalingState === "closed") {
+              console.warn("Connection was closed before handshake finished.");
+              return; // Exit out safely without crashing!
+          }
+
+          const answer = {
+              type: 'answer',
+              sdp: await sdpResponse.text(),
+          };
+          
+          // 3. Now it is safe to set the remote description
+          await pc.setRemoteDescription(answer as RTCSessionDescriptionInit);
+
+          console.log("🟢 Live therapy session connected!");
+
+      } catch (error) {
+          console.error("🔴 Failed to start live therapy:", error);
+          setIsLiveCall(false);
+      }
+  };
+
+  const stopLiveTherapy = async () => {
+      if (peerConnection.current) {
+          // 1. Stop the microphone so the browser actually stops listening (removes the red dot)
+          peerConnection.current.getSenders().forEach((sender) => {
+              if (sender.track) {
+                  sender.track.stop();
+              }
+          });
+
+          // 2. Stop the incoming AI audio tracks instantly
+          peerConnection.current.getReceivers().forEach((receiver) => {
+              if (receiver.track) {
+                  receiver.track.stop();
+              }
+          });
+
+          // 3. Close the connection
+          peerConnection.current.close();
+          peerConnection.current = null;
+      }
+      
+      setIsLiveCall(false);
+      console.log("🔴 Live therapy session ended.");
+
+      // 4. SAVE THE TRANSCRIPT TO THE DATABASE
+      if (liveTranscript.trim() !== "") {
+          try {
+              if (!userId) throw new Error("No user ID found.");
+              
+              // Adapting to use voice_journals table used by fetchJournals
+              const { error } = await supabase
+                  .from('voice_journals') 
+                  .insert({
+                      user_id: userId, 
+                      transcript: "🎙️ LIVE SESSION TRANSCRIPT:" + liveTranscript,
+                      title: "Live Session",
+                      smile_score: 50, // Default for now
+                      mood: "Neutral",
+                      audio_url: "live-session-no-audio", // Placeholder for audio_url
+                      is_vaulted: false,
+                      duration_seconds: 0
+                  });
+
+              if (error) throw error;
+              
+              console.log("✅ Transcript saved to Tape Archive!");
+              setLiveTranscript(""); // Clear it for the next call
+              
+              // 3. Refresh your Tape Archive UI here
+              await fetchJournals(userId); 
+
+          } catch (err) {
+              console.error("Failed to save live session:", err);
+          }
+      }
+  };
+
   /* ═══════════════════════════════════════════
      RENDER — The Lofi Desk
      ═══════════════════════════════════════════ */
@@ -946,25 +1096,16 @@ export default function AITherapistPage() {
 
         {/* Voice Mode Toggle */}
         <div className="flex items-center gap-3 pt-2 pb-1 pl-8 relative z-10 flex-shrink-0">
-          <motion.button
-            onClick={() => setVoiceMode((v) => !v)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] cursor-pointer transition-all border ${voiceMode
-              ? "bg-amber-800 text-amber-100 border-amber-700/50"
-              : "bg-stone-100 text-stone-400 border-stone-200 hover:bg-stone-200"
+          <button 
+              onClick={isLiveCall ? stopLiveTherapy : startLiveTherapy}
+              className={`px-4 py-2 rounded-full font-medium transition-colors ${
+                  isLiveCall 
+                  ? "bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500/30" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
-            style={{ fontFamily: "Georgia, serif" }}
           >
-            🎙️ Voice: {voiceMode ? "ON" : "OFF"}
-            {isListening && (
-              <motion.span
-                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
-                transition={{ repeat: Infinity, duration: 1.2 }}
-                className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_rgba(34,197,94,0.5)]"
-              />
-            )}
-          </motion.button>
+              {isLiveCall ? "🔴 End Live Session" : "🎙️ Start Live Session"}
+          </button>
           {voiceMode && isListening && !isThinking && (
             <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] italic text-stone-400" style={{ fontFamily: "Georgia, serif" }}>
               Listening…
@@ -1277,17 +1418,19 @@ export default function AITherapistPage() {
                   </div>
 
                   {/* Play button */}
-                  <motion.button
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => handleTogglePlay(j)}
-                    className={`w-9 h-9 rounded-full border-0 cursor-pointer flex items-center justify-center text-white text-[11px] flex-shrink-0 transition-colors shadow-md ${playingId === j.id
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-stone-700 hover:bg-stone-600"
-                      }`}
-                  >
-                    {playingId === j.id ? "⏸" : "▶"}
-                  </motion.button>
+                  {j.audio_url !== "live-session-no-audio" && (
+                    <motion.button
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => handleTogglePlay(j)}
+                      className={`w-9 h-9 rounded-full border-0 cursor-pointer flex items-center justify-center text-white text-[11px] flex-shrink-0 transition-colors shadow-md ${playingId === j.id
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-stone-700 hover:bg-stone-600"
+                        }`}
+                    >
+                      {playingId === j.id ? "⏸" : "▶"}
+                    </motion.button>
+                  )}
                 </motion.div>
               ))
             )}
@@ -1558,15 +1701,17 @@ export default function AITherapistPage() {
                               >
                                 🗑️
                               </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleTogglePlay(j)}
-                                className={`w-8 h-8 rounded-full border-0 cursor-pointer flex items-center justify-center text-white text-[10px] ${playingId === j.id ? "bg-red-600" : "bg-zinc-600 hover:bg-zinc-500"
-                                  }`}
-                              >
-                                {playingId === j.id ? "⏸" : "▶"}
-                              </motion.button>
+                              {j.audio_url !== "live-session-no-audio" && (
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleTogglePlay(j)}
+                                  className={`w-8 h-8 rounded-full border-0 cursor-pointer flex items-center justify-center text-white text-[10px] ${playingId === j.id ? "bg-red-600" : "bg-zinc-600 hover:bg-zinc-500"
+                                    }`}
+                                >
+                                  {playingId === j.id ? "⏸" : "▶"}
+                                </motion.button>
+                              )}
                             </div>
                           </motion.div>
                         ))}

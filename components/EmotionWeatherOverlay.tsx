@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import { Layers } from "lucide-react";
 import { CheckIn } from "@/lib/types";
 import {
   EmotionCluster,
@@ -672,6 +673,8 @@ export default function EmotionWeatherOverlay({
   minZoom = 11.2,
 }: EmotionWeatherOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isARMode, setIsARMode] = useState(false);
+  const [arHUD, setArHUD] = useState<{ visible: boolean, x: number, y: number, address: string, vibe: string } | null>(null);
   const clustersRef = useRef<EmotionCluster[]>([]);
   const screenClustersRef = useRef<ScreenCluster[]>([]);
   const animationRef = useRef<number | null>(null);
@@ -841,7 +844,11 @@ export default function EmotionWeatherOverlay({
       popupRef.current = null;
       statesRef.current.clear();
       screenClustersRef.current = [];
-      map.getCanvas().style.cursor = "";
+      
+      const canvas = map?.getCanvas ? map.getCanvas() : null;
+      if (canvas) {
+        canvas.style.cursor = "";
+      }
     };
   }, [map, minZoom]);
 
@@ -938,9 +945,195 @@ export default function EmotionWeatherOverlay({
     };
   }, [map]);
 
+  /* ── AR Mode 3D Layer ────────────────────────────────────────── */
+  useEffect(() => {
+    if (!map) return;
+
+    if (!map.getLayer('3d-buildings-ar')) {
+      // Calculate overall average smile score
+      const avgSmile = checkins.length > 0 
+        ? checkins.reduce((sum, c) => sum + ((c as any).smile_score ?? 50), 0) / checkins.length 
+        : 50;
+      
+      const glowColor = avgSmile > 60 ? '#10b981' : (avgSmile < 40 ? '#e11d48' : '#3b82f6');
+
+	if (!map || !map.isStyleLoaded()) return;
+
+	const style = map.getStyle();
+	if (!style) return;
+
+	const layers = style.layers || [];
+
+	const labelLayerId = layers.find(
+  (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field']
+)?.id;
+
+      if (!map.getSource('composite')) return; // Check if source is ready (wait for load event usually, but checking here works if it's already running)
+
+      try {
+        map.addLayer(
+          {
+            id: '3d-buildings-ar',
+            source: 'composite',
+            'source-layer': 'building',
+            filter: ['==', 'extrude', 'true'],
+            type: 'fill-extrusion',
+            minzoom: 14,
+            layout: {
+              visibility: 'none',
+            },
+            paint: {
+              'fill-extrusion-color': glowColor,
+              'fill-extrusion-height': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                15,
+                0,
+                15.05,
+                ['get', 'height']
+              ],
+              'fill-extrusion-base': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                15,
+                0,
+                15.05,
+                ['get', 'min_height']
+              ],
+              'fill-extrusion-opacity': 0.8
+            }
+          },
+          labelLayerId
+        );
+      } catch (e) {
+         console.warn("Could not add 3D AR layer", e);
+      }
+    }
+
+    if (isARMode) {
+      if (map.getLayer('3d-buildings-ar')) {
+        map.setLayoutProperty('3d-buildings-ar', 'visibility', 'visible');
+      }
+      map.flyTo({ pitch: 65, bearing: -15, zoom: 18, duration: 2000 });
+    } else {
+      if (map.getLayer('3d-buildings-ar')) {
+        map.setLayoutProperty('3d-buildings-ar', 'visibility', 'none');
+      }
+      map.flyTo({ pitch: 0, bearing: 0, zoom: 12, duration: 2000 });
+      setArHUD(null);
+    }
+  }, [map, isARMode, checkins]);
+
+  /* ── AR Mode Interaction ─────────────────────────────────────── */
+  useEffect(() => {
+    if (!map || !isARMode) {
+      setArHUD(null);
+      return;
+    }
+
+    let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
+      if (!isARMode) return;
+      
+      const features = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings-ar'] });
+      if (features.length > 0) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = setTimeout(async () => {
+          try {
+             let address = "Unknown Location";
+             const token = mapboxgl.accessToken;
+             if (token) {
+               const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?access_token=${token}&types=address,poi`);
+               const data = await res.json();
+               if (data.features && data.features.length > 0) {
+                 address = data.features[0].place_name.split(',')[0];
+               }
+             }
+
+             const avgSmile = checkins.length > 0 
+               ? checkins.reduce((sum, c) => sum + ((c as any).smile_score ?? 50), 0) / checkins.length 
+               : 50;
+             const vibe = avgSmile > 60 ? "Energetic / Positive" : (avgSmile < 40 ? "Tense / Melancholy" : "Calm / Neutral");
+
+             setArHUD({
+               visible: true,
+               x: e.point.x,
+               y: e.point.y,
+               address,
+               vibe
+             });
+          } catch(err) {
+             setArHUD({
+               visible: true,
+               x: e.point.x,
+               y: e.point.y,
+               address: "Scanning Error",
+               vibe: "Unknown"
+             });
+          }
+        }, 300);
+      } else {
+        setArHUD(null);
+        clearTimeout(hoverTimeout);
+      }
+    };
+
+    map.on('mousemove', handleMouseMove);
+    return () => {
+      map.off('mousemove', handleMouseMove);
+      clearTimeout(hoverTimeout);
+    };
+  }, [map, isARMode, checkins]);
+
   return (
     <>
+      <div className={`absolute inset-0 z-[31] pointer-events-none transition-all duration-1000 ${isARMode ? 'backdrop-contrast-125 backdrop-brightness-75' : ''}`}>
+        {isARMode && (
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none animate-pulse opacity-30 mix-blend-screen" />
+        )}
+      </div>
+
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-[32]" />
+      
+      {/* AR HUD overlays */}
+      {isARMode && arHUD && arHUD.visible && (
+        <div 
+          className="absolute z-[40] pointer-events-none rounded-xl p-3 shadow-2xl transition-all duration-200"
+          style={{
+            left: arHUD!.x + 20,
+            top: arHUD!.y - 40,
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(12px) saturate(1.5)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            boxShadow: '0 0 20px rgba(16, 185, 129, 0.15), inset 0 0 0 1px rgba(255,255,255,0.05)',
+            transform: 'perspective(500px) rotateX(10deg) rotateY(-5deg)',
+            fontFamily: 'monospace'
+          }}
+        >
+          <div className="text-[10px] text-emerald-400 font-bold mb-1 tracking-widest uppercase">Target Locked</div>
+          <div className="text-sm text-white font-medium break-words max-w-[150px] leading-tight mb-2">
+            {arHUD!.address}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <div className="text-[11px] text-slate-300">Vibe: <span className="text-emerald-300 font-semibold">{arHUD!.vibe}</span></div>
+          </div>
+        </div>
+      )}
+
+      {/* Mode Switcher */}
+      <button
+        onClick={() => setIsARMode(!isARMode)}
+        className="absolute bottom-6 right-6 z-[50] flex items-center justify-center w-12 h-12 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/50 shadow-lg text-white hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 group"
+        aria-label="Toggle AR Mode"
+      >
+        <div className="absolute inset-0 rounded-full group-hover:bg-indigo-500/20 transition-colors pointer-events-none" />
+        <Layers size={22} className={isARMode ? "text-emerald-400" : "text-white"} />
+      </button>
+
       <style jsx global>{`
         .emotion-weather-popup .mapboxgl-popup-content {
           background: rgba(15, 23, 42, 0.95) !important;

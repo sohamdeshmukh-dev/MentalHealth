@@ -47,25 +47,35 @@ export default function CollegePicker({ currentCollege, currentCity, currentMajo
   }, [isEditing]);
 
   const handleSave = async () => {
+    if (!selectedCollegeName) {
+      setSaving(true);
+      try {
+        await onSave(null, selectedCity, major || null, grade || null);
+        setIsEditing(false);
+      } catch (err: any) {
+        console.error("Failed to remove college:", err.message || err);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     setSaving(true);
     try {
-      if (!selectedCollegeName) {
-        await onSave(null, selectedCity, major || null, grade || null);
-      } else {
-        const res = await fetch(`/api/colleges?city=${encodeURIComponent(selectedCity)}&q=${encodeURIComponent(selectedCollegeName)}`);
-        let collegeId: string | null = null;
-        if (res.ok) {
-          const data = await res.json();
-          const match = (data.colleges ?? []).find(
-            (c: { name: string }) => c.name === selectedCollegeName
-          );
-          collegeId = match?.id ?? null;
-        }
-        await onSave(collegeId, selectedCity, major || null, grade || null);
+      const res = await fetch(`/api/colleges?city=${encodeURIComponent(selectedCity)}&q=${encodeURIComponent(selectedCollegeName)}`);
+      let collegeId: string | null = null;
+      if (res.ok) {
+        const data = await res.json();
+        const match = (data.colleges ?? []).find(
+          (c: { name: string }) => c.name === selectedCollegeName
+        );
+        collegeId = match?.id ?? null;
       }
+      
+      await onSave(collegeId, selectedCity, major || null, grade || null);
       setIsEditing(false);
-    } catch (err) {
-      console.error("Failed to save college:", err);
+    } catch (err: any) {
+      console.error("Failed to save college:", err.message || err);
     } finally {
       setSaving(false);
     }
