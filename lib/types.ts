@@ -51,6 +51,9 @@ export interface CampusEmotionResponse {
   checkin_count: number;
   trend_data: CampusTrendPoint[];
   top_reported_emotions: CampusEmotionDistributionItem[];
+  top_emotions?: { emotion: string; percentage: number }[];
+  overall_vibe?: string;
+  recent_checkins?: number;
   recent_mood_trends: {
     today: CampusWindowTrend;
     week: CampusWindowTrend;

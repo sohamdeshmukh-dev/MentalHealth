@@ -138,17 +138,15 @@ function buildCampusInsightHtml(college: College, insights: CampusEmotionRespons
     </div>`;
   }
 
-  const topEmotions = insights.top_reported_emotions
-    .map((emotion) => `${escapeHtml(emotion.emotion)} (${emotion.share.toFixed(1)}%)`)
+  const topEmotions = (insights.top_emotions || [])
+    .map((emotion) => `${escapeHtml(emotion.emotion)} (${emotion.percentage}%)`)
     .join(" • ");
 
-  const distributionRows = insights.emotion_distribution
-    .filter((emotion) => emotion.count > 0)
-    .slice(0, 4)
+  const distributionRows = (insights.top_emotions || [])
     .map(
       (emotion) => `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:4px">
         <span style="color:#cbd5e1">${escapeHtml(emotion.emotion)}</span>
-        <span style="color:#f8fafc;font-weight:600">${emotion.count}</span>
+        <span style="color:#f8fafc;font-weight:600">${emotion.percentage}%</span>
       </div>`
     )
     .join("");
@@ -157,8 +155,8 @@ function buildCampusInsightHtml(college: College, insights: CampusEmotionRespons
 
   return `<div style="font-size:12px;color:#e2e8f0;min-width:280px;line-height:1.45">
     <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Campus Insight</div>
-    <div style="margin-top:6px;font-size:14px;font-weight:700;color:#f8fafc">${escapeHtml(insights.college_name)}</div>
-    <p style="margin:6px 0 0;color:#94a3b8">${escapeHtml(insights.city)} • ${insights.participant_count} students</p>
+    <div style="margin-top:6px;font-size:14px;font-weight:700;color:#f8fafc">${escapeHtml(insights.college_name || "Campus")}</div>
+    <p style="margin:6px 0 0;color:#94a3b8">${escapeHtml(insights.city || "")} • ${insights.participant_count || 0} students</p>
 
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(148,163,184,0.25)">
       <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Top Emotions</div>
@@ -187,7 +185,7 @@ function buildCampusInsightHtml(college: College, insights: CampusEmotionRespons
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(148,163,184,0.25)">
       <div style="display:flex;justify-content:space-between;gap:12px">
         <span style="color:#94a3b8">Total Check-ins</span>
-        <strong style="color:#f8fafc">${insights.checkin_count}</strong>
+        <strong style="color:#f8fafc">${insights.recent_checkins ?? insights.checkin_count ?? 0}</strong>
       </div>
     </div>
   </div>`;

@@ -35,6 +35,7 @@ interface Map3DViewProps {
   registeredCollege?: College | null;
   campusInsights?: CampusEmotionResponse | null;
   focusRegisteredCampus?: boolean;
+  isSpinning?: boolean;
   onToggleSpin?: (isSpinning: boolean) => void;
   onSeedSafeSpaces?: () => Promise<void>;
   isSeeding?: boolean;
@@ -49,6 +50,7 @@ export default function Map3DView({
   registeredCollege = null,
   campusInsights = null,
   focusRegisteredCampus = false,
+  isSpinning = false,
   onToggleSpin,
   onSeedSafeSpaces,
   isSeeding = false,
@@ -57,7 +59,6 @@ export default function Map3DView({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
   const readyRef = useRef(false);
-  const [isSpinning, setIsSpinning] = useState(false);
   const spinFrameRef = useRef<number | null>(null);
   const [draftSafeSpace, setDraftSafeSpace] = useState<{ lat: number; lng: number } | null>(null);
   const safeSpacesRefetchRef = useRef<() => void>(() => { });
@@ -247,7 +248,7 @@ export default function Map3DView({
 
   // ── Fly to city + update mask ────────────────────────────────
   useEffect(() => {
-    setIsSpinning(false);
+    if (onToggleSpin) onToggleSpin(false);
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
 
@@ -435,11 +436,7 @@ export default function Map3DView({
 
   // ── Cinematic Auto-Spin (ADDITIVE / ISOLATED) ──
   useEffect(() => {
-    if (onToggleSpin) {
-      onToggleSpin(isSpinning);
-    }
-
-    if (!isSpinning || !mapRef.current) {
+    if (!isSpinning || !mapInstance) {
       if (spinFrameRef.current) {
         cancelAnimationFrame(spinFrameRef.current);
         spinFrameRef.current = null;
@@ -448,8 +445,8 @@ export default function Map3DView({
     }
 
     function spin() {
-      if (!mapRef.current) return;
-      mapRef.current.rotateTo(mapRef.current.getBearing() + 0.2, { duration: 0 });
+      if (!mapInstance) return;
+      mapInstance.rotateTo(mapInstance.getBearing() + 0.2, { duration: 0 });
       spinFrameRef.current = requestAnimationFrame(spin);
     }
     spinFrameRef.current = requestAnimationFrame(spin);
@@ -460,7 +457,7 @@ export default function Map3DView({
         spinFrameRef.current = null;
       }
     };
-  }, [isSpinning, onToggleSpin]);
+  }, [isSpinning, mapInstance]);
 
   // ── Safe Spaces: Native WebGL layers (zero-drift, ADDITIVE / ISOLATED) ──
 

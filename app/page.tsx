@@ -221,6 +221,7 @@ export default function Home() {
         registeredCollege={registeredCollege}
         campusInsights={campusInsights}
         focusRegisteredCampus={isCampusMode}
+        isSpinning={isSpinning}
         onToggleSpin={setIsSpinning}
         isSeeding={isSeeding}
         onSeedSafeSpaces={handleSeedSpaces}
