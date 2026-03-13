@@ -103,18 +103,20 @@ export default function NavigationMenu() {
           }
         }}
       >
-        <motion.button
-          type="button"
-          aria-label={isOpen ? "Close menu" : "Open menu"}
-          className="pointer-events-auto absolute left-2 top-2 z-30 rounded-full border border-white/15 bg-black p-3.5 text-white transition-all duration-200 ease-out hover:scale-[1.05] hover:brightness-125 hover:shadow-[0_0_18px_rgba(45,212,191,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
-          onClick={() => {
-            setIsOpen((current) => !current);
-            setHoveredHref(null);
-          }}
-          whileTap={{ scale: 0.96 }}
-        >
-          <span className="block text-xs font-semibold tracking-[0.12em]">MENU</span>
-        </motion.button>
+        <div className="pointer-events-auto absolute left-2 top-2 z-30">
+          <motion.button
+            type="button"
+            aria-label={isOpen ? "Close menu" : "Open menu"}
+            className="rounded-full border border-white/15 bg-black p-3.5 text-white transition-all duration-200 ease-out hover:scale-[1.05] hover:brightness-125 hover:shadow-[0_0_18px_rgba(45,212,191,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
+            onClick={() => {
+              setIsOpen((current) => !current);
+              setHoveredHref(null);
+            }}
+            whileTap={{ scale: 0.96 }}
+          >
+            <span className="block text-xs font-semibold tracking-[0.12em]">MENU</span>
+          </motion.button>
+        </div>
 
         <AnimatePresence>
           {isOpen ? (

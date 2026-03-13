@@ -1036,3 +1036,207 @@ html {
 .mapboxgl-ctrl-bottom-right {
     bottom: 80px !important; 
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DAILY THERAPIST CHECK-IN POPUP
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Overlay ─── */
+.daily-checkin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 20px;
+}
+
+/* ─── Card ─── */
+.daily-checkin-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.95) 0%,
+    rgba(10, 16, 32, 0.98) 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 20px;
+  padding: 40px 32px 32px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 60px rgba(20, 184, 166, 0.06);
+  text-align: center;
+}
+
+/* ─── Close button ─── */
+.daily-checkin-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.daily-checkin-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+/* ─── Decorative icon ─── */
+.daily-checkin-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 12px rgba(20, 184, 166, 0.25));
+}
+
+/* ─── Title ─── */
+.daily-checkin-title {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0 0 16px;
+  letter-spacing: -0.3px;
+}
+
+/* ─── Prompt text ─── */
+.daily-checkin-prompt {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #94a3b8;
+  margin: 0 0 28px;
+  font-style: italic;
+}
+
+/* ─── Button container ─── */
+.daily-checkin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Buttons ─── */
+.daily-checkin-btn {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border: none;
+  letter-spacing: 0.2px;
+}
+
+.daily-checkin-btn-primary {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  color: #ffffff;
+  box-shadow:
+    0 4px 18px rgba(20, 184, 166, 0.3),
+    0 0 0 1px rgba(20, 184, 166, 0.15) inset;
+}
+
+.daily-checkin-btn-primary:hover {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  box-shadow:
+    0 6px 24px rgba(20, 184, 166, 0.45),
+    0 0 0 1px rgba(20, 184, 166, 0.25) inset;
+  transform: translateY(-1px);
+}
+
+.daily-checkin-btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.daily-checkin-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHECKIN BADGE (Exclamation ! indicator)
+   ═══════════════════════════════════════════════════════════════ */
+
+.checkin-badge-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.checkin-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.8);
+  animation: checkin-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+  z-index: 10;
+}
+
+@keyframes checkin-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.7);
+    transform: scale(1.12);
+  }
+}
+
+/* Tooltip */
+.checkin-badge-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.checkin-badge:hover + .checkin-badge-tooltip,
+.checkin-badge-wrapper:hover .checkin-badge-tooltip {
+  opacity: 1;
+}

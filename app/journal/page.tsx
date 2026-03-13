@@ -14,6 +14,7 @@ import StatsCard from "@/components/StatsCard";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useLocation } from "@/hooks/useLocation";
 import { useMoodEntry } from "@/hooks/useMoodEntry";
+import { markDailyCheckInCompleted } from "@/hooks/useDailyCheckIn";
 import { Mood, MOODS } from "@/lib/types";
 
 const DEFAULT_INTENSITY = 40;
@@ -50,8 +51,11 @@ function calculateStreak(createdAts: string[]) {
 }
 
 export default function JournalPage() {
+  const [feelingNow, setFeelingNow] = useState("");
   const [selectedEmotion, setSelectedEmotion] = useState<Mood | null>(null);
+  const [moodInfluence, setMoodInfluence] = useState("");
   const [intensity, setIntensity] = useState(DEFAULT_INTENSITY);
+  const [needRightNow, setNeedRightNow] = useState("");
   const [note, setNote] = useState("");
   const [weekThreshold] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -92,13 +96,38 @@ export default function JournalPage() {
   const thisWeekCount = useMemo(() => {
     return entries.filter((entry) => new Date(entry.createdAt).getTime() >= weekThreshold).length;
   }, [entries, weekThreshold]);
+  const isDailyCheckInComplete = Boolean(
+    selectedEmotion &&
+    feelingNow.trim() &&
+    moodInfluence.trim() &&
+    needRightNow.trim()
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedEmotion) {
+    const trimmedFeelingNow = feelingNow.trim();
+    const trimmedMoodInfluence = moodInfluence.trim();
+    const trimmedNeedRightNow = needRightNow.trim();
+
+    if (!selectedEmotion || !trimmedFeelingNow || !trimmedMoodInfluence || !trimmedNeedRightNow) {
       return;
     }
+
+    const structuredResponses = [
+      `Q1. How are you feeling right now?\n${trimmedFeelingNow}`,
+      `Q2. What emotion best describes your current state?\n${selectedEmotion}`,
+      `Q3. What influenced your mood today?\n${trimmedMoodInfluence}`,
+      `Q4. How intense is this feeling?\n${Math.round(intensity)}/100`,
+      `Q5. What is one thing you need right now?\n${trimmedNeedRightNow}`,
+    ];
+
+    const trimmedNote = note.trim();
+    if (trimmedNote) {
+      structuredResponses.push(`Additional reflection\n${trimmedNote}`);
+    }
+
+    const journalText = structuredResponses.join("\n\n").slice(0, 1000);
 
     let imageUrl: string | undefined;
 
@@ -113,7 +142,7 @@ export default function JournalPage() {
     const didSave = await saveEntry({
       emotion: selectedEmotion,
       intensity,
-      note,
+      note: journalText,
       imageUrl,
       location: location.trim() ? location.trim() : undefined,
     });
@@ -122,11 +151,15 @@ export default function JournalPage() {
       return;
     }
 
+    markDailyCheckInCompleted();
     setSavedMood(selectedEmotion);
     setShowModal(true);
 
+    setFeelingNow("");
     setSelectedEmotion(null);
+    setMoodInfluence("");
     setIntensity(DEFAULT_INTENSITY);
+    setNeedRightNow("");
     setNote("");
     clearImage();
     clearLocation();
@@ -150,7 +183,27 @@ export default function JournalPage() {
           <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">Today&apos;s Mood</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">Daily Emotional Check-In</h2>
+                <p className="mt-1 text-xs text-[var(--muted-text)]">Please complete all 5 questions before submitting.</p>
+              </div>
+
+              <div className="space-y-3 rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">1. How are you feeling right now?</h3>
+                </div>
+                <input
+                  value={feelingNow}
+                  onChange={(event) => setFeelingNow(event.target.value)}
+                  placeholder="A quick sentence about your current state."
+                  maxLength={160}
+                  className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm text-[var(--foreground)] placeholder:text-[var(--subtle-text)] outline-none transition-all focus:border-teal-400/60 focus:ring-2 focus:ring-teal-400/20"
+                  required
+                />
+                <p className="text-right text-[11px] text-[var(--subtle-text)]">{feelingNow.length}/160</p>
+              </div>
+
+              <div className="rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">2. What emotion best describes your current state?</h3>
                 <p className="mt-1 text-xs text-[var(--muted-text)]">Select your mood from the wheel.</p>
                 <div className="mt-5">
                   <MoodWheel value={selectedEmotion} onChange={setSelectedEmotion} />
@@ -158,31 +211,65 @@ export default function JournalPage() {
               </div>
 
               {selectedEmotion ? (
-                <EmotionIntensitySlider
-                  emotion={selectedEmotion}
-                  value={intensity}
-                  onChange={setIntensity}
-                />
+                <div className="space-y-3 rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">4. How intense is this feeling? (1-100)</h3>
+                  <EmotionIntensitySlider
+                    emotion={selectedEmotion}
+                    value={intensity}
+                    onChange={setIntensity}
+                  />
+                </div>
               ) : (
                 <div className="rounded-3xl border border-dashed border-[var(--border-soft)] bg-[var(--surface-2)] p-6 text-sm text-[var(--muted-text)]">
-                  Emotion Intensity appears after mood selection.
+                  Question 4 unlocks after you select an emotion for question 2.
                 </div>
               )}
 
               <div className="space-y-3 rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Journal Note (optional)</h3>
-                  <p className="mt-1 text-xs text-[var(--subtle-text)]">Capture context behind this mood.</p>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">3. What influenced your mood today?</h3>
+                </div>
+                <textarea
+                  value={moodInfluence}
+                  onChange={(event) => setMoodInfluence(event.target.value)}
+                  placeholder="Describe events, thoughts, or interactions that influenced how you feel."
+                  rows={4}
+                  maxLength={320}
+                  required
+                  className="w-full resize-none rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm text-[var(--foreground)] placeholder:text-[var(--subtle-text)] outline-none transition-all focus:border-teal-400/60 focus:ring-2 focus:ring-teal-400/20"
+                />
+                <p className="text-right text-[11px] text-[var(--subtle-text)]">{moodInfluence.length}/320</p>
+              </div>
+
+              <div className="space-y-3 rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">5. What is one thing you need right now?</h3>
+                </div>
+                <input
+                  value={needRightNow}
+                  onChange={(event) => setNeedRightNow(event.target.value)}
+                  placeholder="Rest, support, clarity, connection, movement, etc."
+                  maxLength={180}
+                  required
+                  className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm text-[var(--foreground)] placeholder:text-[var(--subtle-text)] outline-none transition-all focus:border-teal-400/60 focus:ring-2 focus:ring-teal-400/20"
+                />
+                <p className="text-right text-[11px] text-[var(--subtle-text)]">{needRightNow.length}/180</p>
+              </div>
+
+              <div className="space-y-3 rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-1)] p-6 backdrop-blur-sm">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Additional Journal Note (optional)</h3>
+                  <p className="mt-1 text-xs text-[var(--subtle-text)]">Add extra context if you want.</p>
                 </div>
                 <textarea
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                   placeholder="Write about your day, what happened, or what helped."
-                  rows={5}
-                  maxLength={1000}
+                  rows={4}
+                  maxLength={500}
                   className="w-full resize-none rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm text-[var(--foreground)] placeholder:text-[var(--subtle-text)] outline-none transition-all focus:border-teal-400/60 focus:ring-2 focus:ring-teal-400/20"
                 />
-                <p className="text-right text-[11px] text-[var(--subtle-text)]">{note.length}/1000</p>
+                <p className="text-right text-[11px] text-[var(--subtle-text)]">{note.length}/500</p>
               </div>
 
               <ImageUploader
@@ -221,10 +308,10 @@ export default function JournalPage() {
                   <Button
                     type="submit"
                     isLoading={isBusy}
-                    disabled={!selectedEmotion || isBusy}
+                    disabled={!isDailyCheckInComplete || isBusy}
                     className="w-full relative overflow-hidden"
                   >
-                    <span className="relative z-10">Save Journal Entry</span>
+                    <span className="relative z-10">Submit Daily Check-In</span>
                     {selectedMood && (
                       <motion.div
                         className="absolute inset-0 opacity-20"
@@ -239,6 +326,9 @@ export default function JournalPage() {
                 {isSaving ? <p className="text-xs text-indigo-500">Saving entry...</p> : null}
                 {saveSuccess ? <p className="text-xs font-medium text-emerald-300">Entry saved ✓</p> : null}
                 {saveError ? <p className="text-xs text-red-300">{saveError}</p> : null}
+                {!isDailyCheckInComplete && !isBusy ? (
+                  <p className="text-xs text-amber-300">Complete all 5 check-in questions to submit.</p>
+                ) : null}
               </motion.div>
             </form>
 
@@ -403,7 +493,7 @@ export default function JournalPage() {
                     transition={{ delay: 0.3 }}
                     className="text-3xl sm:text-4xl font-serif italic text-white leading-relaxed mb-10"
                   >
-                    "{quote}"
+                    &ldquo;{quote}&rdquo;
                   </motion.h2>
                 );
               })()}

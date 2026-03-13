@@ -1,9 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CityNavigator from "@/components/CityNavigator";
+import DailyCheckInCard from "@/components/DailyCheckInCard";
+import DailyCheckInReminder from "@/components/DailyCheckInReminder";
 import LocalClock from "@/components/LocalClock";
+import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import {
   CampusEmotionResponse,
   CheckIn,
@@ -17,6 +21,7 @@ const Map3DView = dynamic(() => import("@/components/Map3DView"), {
 });
 
 export default function Home() {
+  const router = useRouter();
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [cityIndex, setCityIndex] = useState(0);
   const [timeFilter, setTimeFilter] = useState("All");
@@ -27,9 +32,15 @@ export default function Home() {
 
   const [isSpinning, setIsSpinning] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const { showCard, showReminder, dismissCard, reopenCard, startCheckIn } = useDailyCheckIn();
 
   const didAutoCenterRef = useRef(false);
   const city = CITIES[cityIndex];
+
+  const handleStartDailyCheckIn = useCallback(() => {
+    startCheckIn();
+    router.push("/journal");
+  }, [router, startCheckIn]);
 
   const fetchCheckins = useCallback(async () => {
     try {
@@ -226,6 +237,13 @@ export default function Home() {
         isSeeding={isSeeding}
         onSeedSafeSpaces={handleSeedSpaces}
       />
+
+      <DailyCheckInCard
+        isOpen={showCard}
+        onStartCheckIn={handleStartDailyCheckIn}
+        onDismiss={dismissCard}
+      />
+      <DailyCheckInReminder show={showReminder} onClick={reopenCard} />
 
       {/* ✅ Top Center: Location Search */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 text-center">
