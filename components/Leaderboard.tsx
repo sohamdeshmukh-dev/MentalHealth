@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { getCollegeLogoUrl } from "@/lib/collegeList";
 
 interface LeaderboardEntry {
     id: string;
@@ -10,6 +11,8 @@ interface LeaderboardEntry {
     avatar_url?: string;
     total_journals: number;
     isCurrentUser?: boolean;
+    college_id?: string;
+    college_name?: string;
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -29,15 +32,16 @@ export default function Leaderboard() {
         try {
             const { data } = await supabase
                 .from('profiles')
-                .select('id, display_name, unique_code, avatar_url, total_journals')
+                .select('id, display_name, unique_code, avatar_url, total_journals, college_id, colleges(name)')
                 .order('total_journals', { ascending: false })
                 .limit(10);
 
             if (data) {
-                setEntries(data.map(profile => ({
+                setEntries(data.map((profile: any) => ({
                     ...profile,
                     total_journals: profile.total_journals || 0,
-                    isCurrentUser: currentUserId ? profile.id === currentUserId : false
+                    isCurrentUser: currentUserId ? profile.id === currentUserId : false,
+                    college_name: profile.colleges?.name
                 })));
             }
         } catch (err) {
@@ -118,11 +122,20 @@ export default function Leaderboard() {
                     </div>
 
                     {/* Avatar */}
-                    <div className="h-9 w-9 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                        {entry.avatar_url ? (
-                            <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-sm text-slate-500">👤</span>
+                    <div className="relative">
+                        <div className="h-9 w-9 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                            {entry.avatar_url ? (
+                                <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-sm text-slate-500">👤</span>
+                            )}
+                        </div>
+                        {entry.college_id && (
+                            <img 
+                                src={getCollegeLogoUrl(entry.college_id, 32)} 
+                                alt="College" 
+                                className="w-3.5 h-3.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white shadow-sm"
+                            />
                         )}
                     </div>
 
@@ -143,6 +156,11 @@ export default function Leaderboard() {
                             </div>
                             {(entry.display_name || entry.isCurrentUser) && (
                                 <p className="text-[11px] text-slate-400 truncate">#{entry.unique_code}</p>
+                            )}
+                            {entry.college_name && (
+                                <div className="text-[10px] text-teal-400/90 mt-0.5 flex items-center gap-1 font-medium truncate">
+                                    🎓 {entry.college_name}
+                                </div>
                             )}
                         </div>
                     </div>

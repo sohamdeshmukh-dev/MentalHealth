@@ -40,6 +40,7 @@ export default function ProfilePage() {
     const [savingUsername, setSavingUsername] = useState(false);
     const [shieldActive, setShieldActive] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [campusPeers, setCampusPeers] = useState<any[]>([]);
     const { theme, setTheme, toggleTheme } = useTheme();
 
     const fetchProfileData = useCallback(async () => {
@@ -135,6 +136,16 @@ export default function ProfilePage() {
                     setIsCampusLoading(false);
                 }
             });
+
+        // Fetch peers right after
+        if (profile?.id) {
+            fetch(`/api/campus/${encodeURIComponent(college.id)}/peers?userId=${profile.id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (isMounted && data.peers) setCampusPeers(data.peers);
+                })
+                .catch(err => console.error("Error fetching peers:", err));
+        }
 
         return () => {
             isMounted = false;
@@ -528,6 +539,37 @@ export default function ProfilePage() {
                     journalEntries={journalEntries}
                     loading={isCampusLoading}
                 />
+
+                <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5">
+                    <h3 className="text-lg font-semibold text-white">Meet Your Campus</h3>
+                    <p className="text-sm text-gray-400 mb-4">Classmates at your school</p>
+
+                    {campusPeers.length === 0 ? (
+                        <p className="text-sm text-gray-500">No other peers found at your school yet! Invite some friends.</p>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {campusPeers.map((peer) => (
+                                <div key={peer.id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            {/* Use a generic name since username doesn't exist yet */}
+                                            <span className="font-medium text-white">Campus Peer</span>
+                                            {/* Use unique_code instead of anon_code */}
+                                            <span className="text-xs text-gray-500">#{peer.unique_code}</span>
+                                        </div>
+                                        <div className="text-xs text-teal-400/80 mt-1">
+                                            Classmate
+                                        </div>
+                                    </div>
+
+                                    <button className="px-3 py-1.5 text-xs font-medium rounded-full bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors">
+                                        Add Friend
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mt-6">
                     <button

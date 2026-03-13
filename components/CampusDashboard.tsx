@@ -354,72 +354,46 @@ export default function CampusDashboard({ college, campusInsights, journalEntrie
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-              <h3 className="text-sm font-semibold text-slate-200">Top Reported Emotions</h3>
-              <p className="mt-1 text-xs text-slate-400">Campus-wide anonymous distribution</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <h3 className="text-sm font-semibold text-white">Top Reported Emotions</h3>
+              <p className="text-xs text-gray-400 mb-4">Campus-wide anonymous distribution</p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(campusInsights?.top_reported_emotions ?? []).map((emotion) => (
-                  <div
-                    key={emotion.emotion}
-                    className="rounded-full border border-cyan-500/35 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200"
-                  >
-                    {emotion.emotion} • {emotion.share.toFixed(1)}%
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {(campusInsights?.emotion_distribution ?? [])
-                  .filter((emotion) => emotion.count > 0)
-                  .slice(0, 5)
-                  .map((emotion) => (
-                    <div key={emotion.emotion} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300">{emotion.emotion}</span>
-                      <span className="font-semibold text-slate-100">{emotion.count}</span>
+              {/* Check if we have data to show */}
+              {campusInsights?.top_emotions && campusInsights.top_emotions.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {campusInsights.top_emotions.map((item: any, idx: number) => (
+                    <div key={idx} className="bg-black/20 p-4 rounded-lg border border-white/5">
+                      
+                      {/* Emotion Name and Percentage */}
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-semibold text-white">{item.emotion}</span>
+                        <span className="text-xs text-teal-400 font-medium">{item.percentage}%</span>
+                      </div>
+                      
+                      {/* Visual Progress Bar */}
+                      <div className="w-full bg-white/10 rounded-full h-1.5 mb-3">
+                        <div 
+                          className="bg-teal-400 h-1.5 rounded-full shadow-[0_0_8px_rgba(45,212,191,0.4)]" 
+                          style={{ width: `${item.percentage}%` }}
+                        ></div>
+                      </div>
+                      
+                      {/* The AI Generated Insight */}
+                      <p className="text-[13px] text-teal-100/70 italic leading-relaxed">
+                        ✨ {item.message}
+                      </p>
+                      
                     </div>
                   ))}
-              </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic p-4 text-center bg-black/20 rounded-lg">
+                  Not enough check-ins yet to generate campus insights. Be the first to log a mood!
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Phase 3 & 4 UI: Classmates List */}
-          <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-             <h3 className="text-sm font-semibold text-slate-200">Meet Like-Minded Peers</h3>
-             <p className="mt-1 text-xs text-slate-400">Classmates in your major</p>
-
-             {loadingClassmates ? (
-                <p className="mt-4 text-xs text-slate-500">Looking for peers...</p>
-             ) : classmates.length === 0 ? (
-                <p className="mt-4 text-xs text-slate-500">No peers found in your exact major yet! Invite some friends.</p>
-             ) : (
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                   {classmates.map(peer => (
-                      <div key={peer.id} className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-slate-900/50 p-3">
-                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-lg">
-                               {peer.avatar_url ? (
-                                  <img src={peer.avatar_url} alt="avatar" className="h-10 w-10 rounded-full object-cover" />
-                               ) : (
-                                  "🎓"
-                               )}
-                            </div>
-                            <div>
-                               <p className="text-sm font-medium text-slate-200">{peer.full_name || "Anonymous Student"}</p>
-                               <p className="text-[10px] text-slate-400">{peer.grade_level} • {peer.major}</p>
-                            </div>
-                         </div>
-                         <button 
-                            onClick={() => handleAddFriend(peer.id)}
-                            className="rounded-lg bg-teal-500/20 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-500/30 transition"
-                         >
-                            Add Friend
-                         </button>
-                      </div>
-                   ))}
-                </div>
-             )}
-          </div>
         </>
       )}
     </section>

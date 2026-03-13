@@ -6,6 +6,7 @@ import Leaderboard from "@/components/Leaderboard";
 import { createBrowserClient } from "@supabase/ssr";
 import { BookOpen } from "lucide-react";
 import FloatingChat from "@/components/FloatingChat";
+import { getCollegeLogoUrl } from "@/lib/collegeList";
 
 type Tab = "friends" | "leaderboard";
 
@@ -92,7 +93,7 @@ export default function FriendsPage() {
             if (allProfileIds.size > 0) {
                 const { data: profiles } = await supabase
                     .from("profiles")
-                    .select("id, display_name, avatar_url, unique_code")
+                    .select("id, display_name, avatar_url, unique_code, college_id, colleges(name)")
                     .in("id", Array.from(allProfileIds));
                 profiles?.forEach(p => { profilesMap[p.id] = p; });
             }
@@ -112,8 +113,8 @@ export default function FriendsPage() {
                 .select(`
                     id,
                     status,
-                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends),
-                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends)
+                    sender:profiles!friendships_user_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends, college_id, colleges(name)),
+                    receiver:profiles!friendships_friend_id_fkey (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends, college_id, colleges(name))
                 `)
                 .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                 .eq('status', 'accepted');
@@ -125,8 +126,8 @@ export default function FriendsPage() {
                     .select(`
                         id,
                         status,
-                        sender:user_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends),
-                        receiver:friend_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends)
+                        sender:user_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends, college_id, colleges(name)),
+                        receiver:friend_id (id, display_name, avatar_url, unique_code, total_journals, latest_mood, share_mood_with_friends, college_id, colleges(name))
                     `)
                     .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
                     .eq('status', 'accepted');
@@ -432,11 +433,20 @@ export default function FriendsPage() {
                                                         className="flex items-center justify-between bg-white/[0.03] border border-white/[0.05] rounded-xl p-3"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                                                                {req.profile?.avatar_url ? (
-                                                                    <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <span className="text-lg text-slate-500">👤</span>
+                                                            <div className="relative">
+                                                                <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                                    {req.profile?.avatar_url ? (
+                                                                        <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <span className="text-lg text-slate-500">👤</span>
+                                                                    )}
+                                                                </div>
+                                                                {req.profile?.college_id && (
+                                                                    <img 
+                                                                        src={getCollegeLogoUrl(req.profile.college_id, 32)} 
+                                                                        alt="College Logo" 
+                                                                        className="w-4 h-4 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white"
+                                                                    />
                                                                 )}
                                                             </div>
                                                             <div className="min-w-0">
@@ -445,6 +455,11 @@ export default function FriendsPage() {
                                                                 </p>
                                                                 {req.profile?.display_name && (
                                                                     <p className="text-[11px] text-slate-400 truncate">#{req.profile?.unique_code}</p>
+                                                                )}
+                                                                {req.profile?.colleges?.name && (
+                                                                    <div className="text-[10px] text-teal-400/80 mt-0.5 flex items-center gap-1">
+                                                                        🎓 {req.profile.colleges.name}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -482,11 +497,20 @@ export default function FriendsPage() {
                                                         className="flex items-center justify-between bg-white/[0.03] border border-white/[0.05] rounded-xl p-3"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                                                                {req.profile?.avatar_url ? (
-                                                                    <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <span className="text-lg text-slate-500">👤</span>
+                                                            <div className="relative">
+                                                                <div className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                                    {req.profile?.avatar_url ? (
+                                                                        <img src={req.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <span className="text-lg text-slate-500">👤</span>
+                                                                    )}
+                                                                </div>
+                                                                {req.profile?.college_id && (
+                                                                    <img 
+                                                                        src={getCollegeLogoUrl(req.profile.college_id, 32)} 
+                                                                        alt="College Logo" 
+                                                                        className="w-4 h-4 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white"
+                                                                    />
                                                                 )}
                                                             </div>
                                                             <div className="min-w-0">
@@ -495,6 +519,11 @@ export default function FriendsPage() {
                                                                 </p>
                                                                 {req.profile?.display_name && (
                                                                     <p className="text-[11px] text-slate-400 truncate">#{req.profile?.unique_code}</p>
+                                                                )}
+                                                                {req.profile?.colleges?.name && (
+                                                                    <div className="text-[10px] text-teal-400/80 mt-0.5 flex items-center gap-1">
+                                                                        🎓 {req.profile.colleges.name}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -526,11 +555,20 @@ export default function FriendsPage() {
                                             className="flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                                                    {req.avatar_url ? (
-                                                        <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-lg text-slate-500">👤</span>
+                                                <div className="relative">
+                                                    <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                        {req.avatar_url ? (
+                                                            <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-lg text-slate-500">👤</span>
+                                                        )}
+                                                    </div>
+                                                    {req.college_id && (
+                                                        <img 
+                                                            src={getCollegeLogoUrl(req.college_id, 32)} 
+                                                            alt="College Logo" 
+                                                            className="w-4 h-4 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white shadow-sm"
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -539,6 +577,11 @@ export default function FriendsPage() {
                                                     </p>
                                                     {req.display_name && (
                                                         <p className="text-[11px] text-slate-400">#{req.unique_code}</p>
+                                                    )}
+                                                    {req.college_name && (
+                                                        <div className="text-[10px] text-teal-400/80 mt-0.5 flex items-center gap-1 font-medium">
+                                                            🎓 {req.college_name}
+                                                        </div>
                                                     )}
                                                     <div className="text-[11px] text-slate-400">wants to be your friend</div>
                                                 </div>
@@ -578,11 +621,20 @@ export default function FriendsPage() {
                                             className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.1] transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                                                    {req.avatar_url ? (
-                                                        <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-lg text-slate-500">👤</span>
+                                                <div className="relative">
+                                                    <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                        {req.avatar_url ? (
+                                                            <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-lg text-slate-500">👤</span>
+                                                        )}
+                                                    </div>
+                                                    {req.college_id && (
+                                                        <img 
+                                                            src={getCollegeLogoUrl(req.college_id, 32)} 
+                                                            alt="College Logo" 
+                                                            className="w-4 h-4 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white shadow-sm"
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -591,6 +643,11 @@ export default function FriendsPage() {
                                                     </p>
                                                     {req.display_name && (
                                                         <p className="text-[11px] text-slate-400">#{req.unique_code}</p>
+                                                    )}
+                                                    {req.college_name && (
+                                                        <div className="text-[10px] text-teal-400/80 mt-0.5 flex items-center gap-1 font-medium">
+                                                            🎓 {req.college_name}
+                                                        </div>
                                                     )}
                                                     <div className="text-[11px] text-slate-400">Pending...</div>
                                                 </div>
@@ -628,11 +685,20 @@ export default function FriendsPage() {
                                             className="group flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.1] transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
-                                                    {friend.profile?.avatar_url ? (
-                                                        <img src={friend.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-lg text-slate-500">👤</span>
+                                                <div className="relative">
+                                                    <div className="h-10 w-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center">
+                                                        {friend.profile?.avatar_url ? (
+                                                            <img src={friend.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-lg text-slate-500">👤</span>
+                                                        )}
+                                                    </div>
+                                                    {friend.profile?.college_id && (
+                                                        <img 
+                                                            src={getCollegeLogoUrl(friend.profile.college_id, 32)} 
+                                                            alt="College Logo" 
+                                                            className="w-4 h-4 rounded-full absolute -bottom-0.5 -right-0.5 border border-slate-900 bg-white shadow-sm"
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -641,6 +707,11 @@ export default function FriendsPage() {
                                                     </p>
                                                     {friend.profile?.display_name && (
                                                         <p className="text-[11px] text-slate-400">#{friend.profile?.unique_code}</p>
+                                                    )}
+                                                    {friend.profile?.colleges?.name && (
+                                                        <div className="text-[10px] text-teal-400/90 mt-0.5 flex items-center gap-1 font-medium">
+                                                            🎓 {friend.profile.colleges.name}
+                                                        </div>
                                                     )}
                                                     {friend.profile?.share_mood_with_friends && friend.profile?.latest_mood && (
                                                         <div className="mt-1 flex items-center">

@@ -68,7 +68,7 @@ export async function GET() {
     if (allIds.length > 0) {
         const { data: profileData } = await supabase
             .from("profiles")
-            .select("id, username, display_name, avatar_url, unique_code")
+            .select("id, username, display_name, avatar_url, unique_code, college_id, colleges(name)")
             .in("id", allIds);
 
         if (profileData) {
@@ -115,6 +115,8 @@ export async function GET() {
                 display_name: profile?.display_name,
                 avatar_url: profile?.avatar_url,
                 unique_code: profile?.unique_code,
+                college_id: profile?.college_id,
+                college_name: profile?.colleges?.name,
                 entry_count: entryCounts[friendId] || 0,
             };
         }),
@@ -127,6 +129,8 @@ export async function GET() {
                 display_name: profile?.display_name,
                 avatar_url: profile?.avatar_url,
                 unique_code: profile?.unique_code,
+                college_id: profile?.college_id,
+                college_name: profile?.colleges?.name,
             };
         }),
         sent_requests: (sentRequests || []).map((r) => {
@@ -138,6 +142,8 @@ export async function GET() {
                 display_name: profile?.display_name,
                 avatar_url: profile?.avatar_url,
                 unique_code: profile?.unique_code,
+                college_id: profile?.college_id,
+                college_name: profile?.colleges?.name,
             };
         }),
         my_entry_count: entryCounts[user.id] || 0,

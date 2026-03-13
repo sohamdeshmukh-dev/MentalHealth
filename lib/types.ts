@@ -54,6 +54,10 @@ export interface CampusEmotionResponse {
   top_emotions?: { emotion: string; percentage: number }[];
   overall_vibe?: string;
   recent_checkins?: number;
+  total_checkins?: number;
+  checkins_count?: number;
+  students_on_platform?: number;
+  student_count?: number;
   recent_mood_trends: {
     today: CampusWindowTrend;
     week: CampusWindowTrend;
@@ -124,3 +128,15 @@ export const MOOD_INTENSITY: Record<string, number> = {
   Sad: 0.8,
   Overwhelmed: 1.0,
 };
+
+export interface Friend {
+  id: string;
+  friend_id: string;
+  profile?: any;
+  display_name?: string;
+  avatar_url?: string;
+  unique_code?: string;
+  college_id?: string;
+  college_name?: string;
+  entry_count: number;
+}
