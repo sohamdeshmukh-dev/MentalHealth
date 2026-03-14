@@ -46,9 +46,48 @@ export default function ProfilePage() {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [campusPeers, setCampusPeers] = useState<any[]>([]);
     const { theme, setTheme, toggleTheme } = useTheme();
+    const [campusAffiliation, setCampusAffiliation] = useState("Temple University"); // Set to null if you want it hidden by default!
     const [isCanvasLinked, setIsCanvasLinked] = useState(false);
+    const [canvasSyncStatus, setCanvasSyncStatus] = useState("Connect LMS");
     const [isPremium, setIsPremium] = useState(false);
     const [showCheckout, setShowCheckout] = useState(false);
+    const [demoMoodScore, setDemoMoodScore] = useState(50); 
+
+    // Fake Assignments Data
+    const assignments = [
+        { id: 1, title: "Data Structures Midterm", course: "CIS 2168", due: "Tomorrow", stress: "High", color: "text-red-400", bg: "bg-red-500/10" },
+        { id: 2, title: "UX Case Study Draft", course: "DES 3100", due: "In 3 Days", stress: "Medium", color: "text-orange-400", bg: "bg-orange-500/10" },
+        { id: 3, title: "Weekly Reflection", course: "PSY 1001", due: "Friday", stress: "Low", color: "text-green-400", bg: "bg-green-500/10" }
+    ];
+
+    // Original AI Logic 
+    const getAIFeedback = (score: number) => {
+        if (score >= 75) return "✨ Aura AI: You are in a peak flow state today! Your cognitive load capacity is high. We recommend tackling the High-Stress 'Data Structures Midterm' prep right now to maximize your focus.";
+        if (score >= 40) return "✨ Aura AI: You're maintaining a balanced headspace. Don't burn out—focus on moderate tasks like your 'UX Case Study Draft'. Break it into 30-minute Pomodoro sessions.";
+        return "✨ Aura AI: Warning: Your emotional bandwidth is critically low today. Pushing through heavy studying will cause burnout. Just submit the low-stress 'Weekly Reflection' to keep your grades up, then take the rest of the night off. The midterm can wait until you recover.";
+    };
+
+    // The Bulletproof Toggle Handler
+    const handleCanvasToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (isCanvasLinked) {
+            // DISCONNECT
+            setIsCanvasLinked(false);
+            setCanvasSyncStatus("Connect LMS");
+            setDemoMoodScore(50);
+        } else {
+            // CONNECT
+            setCanvasSyncStatus("Authenticating SSO...");
+            setTimeout(() => setCanvasSyncStatus("Fetching Tasks..."), 800);
+            setTimeout(() => setCanvasSyncStatus("Running Aura AI..."), 1600);
+            setTimeout(() => {
+                setIsCanvasLinked(true);
+                setCanvasSyncStatus("Synced ✓");
+            }, 2400);
+        }
+    };
 
 
 
@@ -379,10 +418,6 @@ export default function ProfilePage() {
         }
     }
 
-    const handleCanvasConnect = () => {
-        window.open("https://canvas.instructure.com/login/canvas", "_blank");
-        setTimeout(() => setIsCanvasLinked(true), 1500);
-    };
 
     const handleStripeUpgrade = () => {
         window.open("https://checkout.stripe.com/pay", "_blank");
@@ -550,15 +585,81 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-3 mt-6 mb-6">
-                    <div className="flex justify-between items-center p-4 bg-orange-900/20 border border-orange-500/30 rounded-xl">
-                        <div>
-                            <h4 className="text-white font-semibold">Canvas IQ Integration</h4>
-                            <p className="text-xs text-orange-200/70">Sync assignments to map stress peaks.</p>
+                {/* ONLY SHOW IF CAMPUS IS SELECTED */}
+                {campusAffiliation && (
+                    <div className="space-y-3 mt-6">
+                        <div className={`p-4 border rounded-xl transition-all duration-500 ${isCanvasLinked ? 'bg-gray-900 border-teal-500/50' : 'bg-orange-900/20 border-orange-500/30'}`}>
+                            
+                            {/* Top Header */}
+                            <div className="flex justify-between items-center mb-2">
+                                <div>
+                                    <h4 className="text-white font-semibold">CanvasIQ</h4>
+                                    <p className="text-xs text-gray-400">Sync assignments to map stress peaks.</p>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={handleCanvasToggle} 
+                                    disabled={!isCanvasLinked && canvasSyncStatus !== "Connect LMS"}
+                                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all w-44 flex items-center justify-center ${
+                                        isCanvasLinked ? "bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-900/40" : 
+                                        canvasSyncStatus !== "Connect LMS" ? "bg-gray-700 text-gray-300 animate-pulse" : 
+                                        "bg-orange-600 text-white hover:bg-orange-500"
+                                    }`}
+                                >
+                                    {isCanvasLinked ? "Unsync Canvas" : canvasSyncStatus}
+                                </button>
+                            </div>
+
+                            {/* EXPANDED VIEW ONCE SYNCED */}
+                            {isCanvasLinked && (
+                                <div className="mt-4 pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                                    
+                                    {/* Slider (Demo text removed to look professional) */}
+                                    <div className="mb-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
+                                        <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-bold">Current User Mood</p>
+                                        <input 
+                                            type="range" min="1" max="100" 
+                                            value={demoMoodScore} 
+                                            onChange={(e) => setDemoMoodScore(Number(e.target.value))} 
+                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-teal-500" 
+                                        />
+                                        <div className="flex justify-between text-xs mt-1 font-mono">
+                                            <span className="text-red-400">Burnout (1)</span>
+                                            <span className="text-teal-400 font-bold">Score: {demoMoodScore}</span>
+                                            <span className="text-green-400">Peak Flow (100)</span>
+                                        </div>
+                                    </div>
+
+                                    {/* AI Feedback Box */}
+                                    <div className={`p-4 rounded-lg mb-4 text-sm leading-relaxed border transition-colors duration-300 ${
+                                        demoMoodScore >= 75 ? 'bg-green-900/20 border-green-500/30 text-green-100' :
+                                        demoMoodScore >= 40 ? 'bg-blue-900/20 border-blue-500/30 text-blue-100' :
+                                        'bg-red-900/20 border-red-500/30 text-red-100'
+                                    }`}>
+                                        {getAIFeedback(demoMoodScore)}
+                                    </div>
+
+                                    {/* Fake Assignments List */}
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">Pending Canvas Tasks</p>
+                                        {assignments.map((task) => (
+                                            <div key={task.id} className="flex justify-between items-center bg-black/40 p-3 rounded-lg border border-gray-800/50">
+                                                <div>
+                                                    <p className="text-white text-sm font-semibold">{task.title}</p>
+                                                    <p className="text-xs text-gray-500 font-medium">{task.course} • Due: {task.due}</p>
+                                                </div>
+                                                <div className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-black ${task.bg} ${task.color} border border-current/20`}>
+                                                    {task.stress} Stress
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                </div>
+                            )}
                         </div>
-                        <button onClick={handleCanvasConnect} className={`px-4 py-2 text-sm font-bold rounded-lg transition ${isCanvasLinked ? "bg-orange-500/20 text-orange-400" : "bg-orange-600 text-white"}`}>
-                            {isCanvasLinked ? "Synced ✓" : "Connect LMS"}
-                        </button>
                     </div>
+                )}
                     <div className="flex justify-between items-center p-4 bg-purple-900/20 border border-purple-500/30 rounded-xl">
                         <div>
                             <h4 className="text-white font-semibold">Aura Atlas Pro</h4>
