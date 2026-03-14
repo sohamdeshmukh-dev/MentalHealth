@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import ProfileSafetyPanel from "@/components/ProfileSafetyPanel";
 import CampusDashboard from "@/components/CampusDashboard";
@@ -52,6 +52,9 @@ export default function ProfilePage() {
     const [isPremium, setIsPremium] = useState(false);
     const [showCheckout, setShowCheckout] = useState(false);
     const [demoMoodScore, setDemoMoodScore] = useState(50); 
+    
+    // Add this to store our timeouts!
+    const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
     // Fake Assignments Data
     const assignments = [
@@ -67,26 +70,28 @@ export default function ProfilePage() {
         return "✨ Aura AI: Warning: Your emotional bandwidth is critically low today. Pushing through heavy studying will cause burnout. Just submit the low-stress 'Weekly Reflection' to keep your grades up, then take the rest of the night off. The midterm can wait until you recover.";
     };
 
-    // The Bulletproof Toggle Handler
-    const handleCanvasToggle = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const handleCanvasConnect = () => {
+        setCanvasSyncStatus("Authenticating SSO...");
+        
+        // Store the timeouts so we can cancel them if needed
+        const t1 = setTimeout(() => setCanvasSyncStatus("Fetching Tasks..."), 800);
+        const t2 = setTimeout(() => setCanvasSyncStatus("Running Aura AI..."), 1600);
+        const t3 = setTimeout(() => {
+            setIsCanvasLinked(true);
+            setCanvasSyncStatus("Synced ✓");
+        }, 2400);
 
-        if (isCanvasLinked) {
-            // DISCONNECT
-            setIsCanvasLinked(false);
-            setCanvasSyncStatus("Connect LMS");
-            setDemoMoodScore(50);
-        } else {
-            // CONNECT
-            setCanvasSyncStatus("Authenticating SSO...");
-            setTimeout(() => setCanvasSyncStatus("Fetching Tasks..."), 800);
-            setTimeout(() => setCanvasSyncStatus("Running Aura AI..."), 1600);
-            setTimeout(() => {
-                setIsCanvasLinked(true);
-                setCanvasSyncStatus("Synced ✓");
-            }, 2400);
-        }
+        timeoutRefs.current = [t1, t2, t3];
+    };
+
+    const handleCanvasDisconnect = () => {
+        // KILL ALL TIMEOUTS INSTANTLY so the browser doesn't glitch!
+        timeoutRefs.current.forEach(clearTimeout);
+        timeoutRefs.current = [];
+
+        setIsCanvasLinked(false);
+        setCanvasSyncStatus("Connect LMS");
+        setDemoMoodScore(50);
     };
 
 
@@ -439,112 +444,102 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-[var(--background)] page-enter">
-            <div className="mx-auto max-w-3xl px-4 pb-8 pt-24 sm:px-6">
-                <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
-                        <span className="bg-gradient-to-r from-teal-400 to-violet-400 bg-clip-text text-transparent">
-                            Profile & Safety
-                        </span>
-                    </h1>
-                    <p className="mt-2 text-sm text-[var(--muted-text)]">
-                        Manage your profile, safety tools, and privacy settings
-                    </p>
-                </div>
+        <div className="min-h-screen bg-[var(--background)] page-enter pb-20">
+            <div className="mx-auto max-w-4xl px-4 pt-12">
+                <header className="mb-10 text-center relative py-12 px-6 rounded-3xl overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-purple-500/5 to-transparent animate-gradient-slow" />
+                    <div className="relative z-10">
+                        <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] mb-3">
+                            Profile & Settings
+                        </h1>
+                        <p className="text-lg text-[var(--foreground-muted)] max-w-xl mx-auto">
+                            Manage your workspace, emergency contacts, and campus integration.
+                        </p>
+                    </div>
+                </header>
 
-                <div className="mb-6 app-surface rounded-3xl p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-sm font-semibold text-[var(--foreground)]">Profile Settings</h2>
-                            <p className="mt-1 text-xs text-[var(--muted-text)]">Theme</p>
-                        </div>
-                        <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-1">
-                            <button
-                                onClick={() => setTheme("dark")}
-                                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                                    theme === "dark"
-                                        ? "bg-slate-900 text-white shadow"
-                                        : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
-                                }`}
-                            >
-                                Dark Mode
-                            </button>
-                            <button
-                                onClick={() => setTheme("light")}
-                                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                                    theme === "light"
-                                        ? "bg-white text-slate-900 shadow"
-                                        : "text-[var(--muted-text)] hover:text-[var(--foreground)]"
-                                }`}
-                            >
-                                Light Mode
-                            </button>
-                            <button
-                                onClick={toggleTheme}
-                                className="rounded-xl border border-[var(--border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted-text)] transition-colors hover:text-[var(--foreground)]"
-                            >
-                                Toggle
-                            </button>
+                <div className="mb-8 grid gap-8 md:grid-cols-1">
+                    <div className="app-surface p-6 rounded-3xl border border-[var(--border-soft)]">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-xl font-bold text-[var(--foreground)]">Theme Preference</h2>
+                            <div className="flex bg-[var(--background)] p-1 rounded-xl">
+                                <button
+                                    onClick={() => setTheme("dark")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === "dark" ? "bg-teal-500 text-white shadow-lg" : "text-[var(--foreground-muted)]"}`}
+                                >
+                                    Dark
+                                </button>
+                                <button
+                                    onClick={() => setTheme("light")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === "light" ? "bg-teal-500 text-white shadow-lg" : "text-[var(--foreground-muted)]"}`}
+                                >
+                                    Light
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-6 app-surface rounded-3xl p-6">
-                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="mb-10 app-surface p-8 rounded-3xl border border-[var(--border-soft)] relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl -mr-32 -mt-32 transition-colors duration-500 group-hover:bg-teal-500/10" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -ml-32 -mb-32 transition-colors duration-500 group-hover:bg-indigo-500/10" />
+
+                    <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
                         <div className="relative">
                             <div
                                 onClick={() => setShowAvatars(!showAvatars)}
-                                className="h-24 w-24 rounded-full bg-slate-800 border-2 border-teal-500/40 overflow-hidden flex items-center justify-center cursor-pointer hover:border-teal-400 transition-colors shadow-[0_0_25px_rgba(20,184,166,0.2)]"
+                                className="h-24 w-24 rounded-full bg-[var(--background)] p-1 ring-4 ring-teal-500/20 overflow-hidden cursor-pointer hover:ring-teal-500/50 transition-all shadow-xl"
                             >
                                 {profile?.avatar_url ? (
-                                    <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                    <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-full" />
                                 ) : (
-                                    <span className="text-4xl text-slate-500">👤</span>
+                                    <div className="h-full w-full flex items-center justify-center text-4xl">👤</div>
                                 )}
                             </div>
                             <button
                                 onClick={() => setShowAvatars(!showAvatars)}
-                                className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-teal-600 flex items-center justify-center text-xs text-white shadow-lg hover:bg-teal-500 transition-colors"
+                                className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-teal-500 flex items-center justify-center text-sm shadow-lg hover:scale-110 transition-transform border-4 border-[var(--surface-1)]"
                             >
                                 ✏️
                             </button>
                         </div>
 
-                        <div className="flex-1 text-center sm:text-left">
+                        <div className="flex-1 text-center md:text-left">
                             <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
                                 <input
                                     type="text"
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
-                                    placeholder="Set display name..."
-                                    className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-teal-500/40 focus:outline-none w-48 text-center sm:text-left"
+                                    placeholder="Add your name..."
+                                    className="text-3xl font-bold bg-transparent text-[var(--foreground)] placeholder-[var(--foreground-muted)] focus:outline-none w-full max-w-xs text-center md:text-left"
                                 />
-                                <button
-                                    onClick={handleSaveDisplayName}
-                                    disabled={savingUsername}
-                                    className="rounded-xl bg-teal-600/20 border border-teal-500/30 px-3 py-2 text-xs font-semibold text-teal-400 hover:bg-teal-600/30 transition-all disabled:opacity-50"
-                                >
-                                    {savingUsername ? "Saving..." : "Save"}
-                                </button>
+                                {displayName !== profile?.display_name && (
+                                    <button
+                                        onClick={handleSaveDisplayName}
+                                        disabled={savingUsername}
+                                        className="px-4 py-1.5 text-xs font-bold rounded-xl bg-teal-500 text-white hover:bg-teal-600 transition-colors shadow-sm disabled:opacity-50"
+                                    >
+                                        {savingUsername ? "Saving..." : "Save Name"}
+                                    </button>
+                                )}
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono tracking-wider mb-3">
-                                Code: {profile?.unique_code || "HACK-2024"}
+                            <div className="text-[var(--foreground-muted)] font-medium mb-3 flex items-center justify-center md:justify-start gap-2">
+                                <span className="h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
+                                {userEmail}
                             </div>
-                             <div className="text-[12px] text-slate-500">{userEmail}</div>
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--background)] text-xs font-mono font-bold text-teal-500 border border-teal-500/20">
+                                USER_ID: {profile?.unique_code || "ALPHA-001"}
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-teal-400">
-                                    {isLoading ? "..." : checkInCount}
-                                </div>
-                                <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Check-ins</div>
+                        <div className="flex gap-4">
+                            <div className="text-center px-6 py-3 rounded-2xl bg-[var(--background)] border border-[var(--border-soft)]">
+                                <div className="text-2xl font-black text-teal-500">{isLoading ? ".." : checkInCount}</div>
+                                <div className="text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-wider">Check-ins</div>
                             </div>
-                            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center min-w-[80px]">
-                                <div className="text-xl font-bold text-indigo-400">
-                                    {isLoading ? "..." : journalCount}
-                                </div>
-                                <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Journal</div>
+                            <div className="text-center px-6 py-3 rounded-2xl bg-[var(--background)] border border-[var(--border-soft)]">
+                                <div className="text-2xl font-black text-purple-500">{isLoading ? ".." : journalCount}</div>
+                                <div className="text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-wider">Journals</div>
                             </div>
                         </div>
                     </div>
@@ -584,97 +579,103 @@ export default function ProfilePage() {
                     <SmileScoreSurvey userId={profile?.id} />
                 </div>
 
-                <div className="space-y-3 mt-6 mb-6">
+                <div className="space-y-8 mt-12">
                 {/* ONLY SHOW IF CAMPUS IS SELECTED */}
                 {campusAffiliation && (
-                    <div className="space-y-3 mt-6">
-                        <div className={`p-4 border rounded-xl transition-all duration-500 ${isCanvasLinked ? 'bg-gray-900 border-teal-500/50' : 'bg-orange-900/20 border-orange-500/30'}`}>
-                            
-                            {/* Top Header */}
-                            <div className="flex justify-between items-center mb-2">
-                                <div>
-                                    <h4 className="text-white font-semibold">CanvasIQ</h4>
-                                    <p className="text-xs text-gray-400">Sync assignments to map stress peaks.</p>
-                                </div>
-                                <button 
-                                    type="button"
-                                    onClick={handleCanvasToggle} 
-                                    disabled={!isCanvasLinked && canvasSyncStatus !== "Connect LMS"}
-                                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all w-44 flex items-center justify-center ${
-                                        isCanvasLinked ? "bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-900/40" : 
-                                        canvasSyncStatus !== "Connect LMS" ? "bg-gray-700 text-gray-300 animate-pulse" : 
-                                        "bg-orange-600 text-white hover:bg-orange-500"
-                                    }`}
-                                >
-                                    {isCanvasLinked ? "Unsync Canvas" : canvasSyncStatus}
-                                </button>
+                    <div className="app-surface p-6 rounded-3xl border border-orange-500/20 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-3xl -mr-16 -mt-16" />
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h4 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
+                                    <span className="text-2xl">🎓</span> CanvasIQ Integration
+                                </h4>
+                                <p className="text-sm text-[var(--foreground-muted)] mt-1">Live assignment sync & Aura mood forecasting.</p>
                             </div>
+                            <button 
+                                onClick={isCanvasLinked ? handleCanvasDisconnect : handleCanvasConnect} 
+                                disabled={!isCanvasLinked && canvasSyncStatus !== "Connect LMS"}
+                                className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-lg ${
+                                    isCanvasLinked 
+                                        ? "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20" 
+                                        : canvasSyncStatus !== "Connect LMS" 
+                                            ? "bg-[var(--background)] text-[var(--foreground-muted)] cursor-not-allowed animate-pulse" 
+                                            : "bg-orange-500 text-white hover:bg-orange-600 hover:scale-105 active:scale-95"
+                                }`}
+                            >
+                                {isCanvasLinked ? "Unsync Canvas" : canvasSyncStatus}
+                            </button>
+                        </div>
 
                             {/* EXPANDED VIEW ONCE SYNCED */}
                             {isCanvasLinked && (
-                                <div className="mt-4 pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div className="mt-4 pt-4 border-t border-[var(--border-soft)] animate-in fade-in slide-in-from-top-4 duration-500">
                                     
                                     {/* Slider (Demo text removed to look professional) */}
-                                    <div className="mb-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
-                                        <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-bold">Current User Mood</p>
+                                    <div className="mb-4 bg-[var(--background)] p-4 rounded-2xl border border-[var(--border-soft)]">
+                                        <p className="text-xs font-black text-teal-500 mb-3 uppercase tracking-widest">Aura Sync: Adjust Mood</p>
                                         <input 
                                             type="range" min="1" max="100" 
                                             value={demoMoodScore} 
                                             onChange={(e) => setDemoMoodScore(Number(e.target.value))} 
-                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-teal-500" 
+                                            className="w-full h-2 bg-[var(--surface-1)] rounded-lg appearance-none cursor-pointer accent-teal-500" 
                                         />
-                                        <div className="flex justify-between text-xs mt-1 font-mono">
-                                            <span className="text-red-400">Burnout (1)</span>
-                                            <span className="text-teal-400 font-bold">Score: {demoMoodScore}</span>
-                                            <span className="text-green-400">Peak Flow (100)</span>
+                                        <div className="flex justify-between text-[10px] mt-2 font-black uppercase tracking-tighter">
+                                            <span className="text-red-400">Burnout</span>
+                                            <span className="text-teal-500 text-sm">Score: {demoMoodScore}</span>
+                                            <span className="text-green-400">Peak Flow</span>
                                         </div>
                                     </div>
 
                                     {/* AI Feedback Box */}
-                                    <div className={`p-4 rounded-lg mb-4 text-sm leading-relaxed border transition-colors duration-300 ${
-                                        demoMoodScore >= 75 ? 'bg-green-900/20 border-green-500/30 text-green-100' :
-                                        demoMoodScore >= 40 ? 'bg-blue-900/20 border-blue-500/30 text-blue-100' :
-                                        'bg-red-900/20 border-red-500/30 text-red-100'
+                                    <div className={`p-4 rounded-2xl mb-6 text-sm font-medium leading-relaxed border shadow-inner transition-all duration-500 ${
+                                        demoMoodScore >= 75 ? 'bg-teal-500/10 border-teal-500/30 text-teal-100' :
+                                        demoMoodScore >= 40 ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-100' :
+                                        'bg-red-500/10 border-red-500/30 text-red-100'
                                     }`}>
                                         {getAIFeedback(demoMoodScore)}
                                     </div>
 
-                                    {/* Fake Assignments List */}
-                                    <div className="space-y-2">
-                                        <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">Pending Canvas Tasks</p>
-                                        {assignments.map((task) => (
-                                            <div key={task.id} className="flex justify-between items-center bg-black/40 p-3 rounded-lg border border-gray-800/50">
-                                                <div>
-                                                    <p className="text-white text-sm font-semibold">{task.title}</p>
-                                                    <p className="text-xs text-gray-500 font-medium">{task.course} • Due: {task.due}</p>
+                                    <div className="space-y-3">
+                                        <h5 className="text-xs font-black uppercase text-[var(--foreground-muted)] tracking-widest pl-1">Live Feed: Next 72 Hours</h5>
+                                        <div className="grid gap-3">
+                                            {assignments.map((task) => (
+                                                <div key={task.id} className="flex justify-between items-center bg-[var(--background)] p-4 rounded-2xl border border-[var(--border-soft)] hover:border-teal-500/30 transition-all hover:translate-x-1">
+                                                    <div>
+                                                        <p className="text-[var(--foreground)] font-bold text-sm">{task.title}</p>
+                                                        <p className="text-xs font-medium text-[var(--foreground-muted)]">{task.course} • {task.due}</p>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                                        task.stress === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                        task.stress === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                                        'bg-green-500/10 text-green-400 border-green-500/20'
+                                                    }`}>
+                                                        {task.stress}
+                                                    </span>
                                                 </div>
-                                                <div className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-black ${task.bg} ${task.color} border border-current/20`}>
-                                                    {task.stress} Stress
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
 
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
-                    <div className="flex justify-between items-center p-4 bg-purple-900/20 border border-purple-500/30 rounded-xl">
-                        <div>
-                            <h4 className="text-white font-semibold">Aura Atlas Pro</h4>
-                            <p className="text-xs text-purple-200/70">$5.49/mo for advanced AI mood forecasting.</p>
+                    )}
+                    <div className="app-surface p-6 rounded-3xl border border-indigo-500/20 flex justify-between items-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl -mr-16 -mt-16" />
+                        <div className="relative z-10">
+                            <h4 className="text-lg font-bold text-[var(--foreground)]">Aura Atlas Pro</h4>
+                            <p className="text-sm text-[var(--foreground-muted)] mt-1">$5.49/mo for advanced mood forecasting.</p>
                         </div>
                         <button 
                             onClick={() => setShowCheckout(true)} 
                             disabled={isPremium}
-                            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all duration-300 w-36 flex justify-center ${
+                            className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-lg relative z-10 ${
                                 isPremium 
-                                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/50 cursor-default" 
-                                    : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
+                                    ? "bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 cursor-default" 
+                                    : "bg-indigo-500 text-white hover:bg-indigo-600 hover:scale-105 active:scale-95 shadow-indigo-500/20"
                             }`}
                         >
-                            {isPremium ? "Active ✓" : "Upgrade"}
+                            {isPremium ? "Active" : "Upgrade"}
                         </button>
                     </div>
                 </div>
@@ -694,29 +695,33 @@ export default function ProfilePage() {
                     loading={isCampusLoading}
                 />
 
-                <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5">
-                    <h3 className="text-lg font-semibold text-white">Meet Your Campus</h3>
-                    <p className="text-sm text-gray-400 mb-4">Classmates at your school</p>
+                <div className="mt-12 app-surface p-8 rounded-3xl border border-[var(--border-soft)]">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-2xl font-bold text-[var(--foreground)]">Meet Your Campus</h3>
+                            <p className="text-sm text-[var(--foreground-muted)]">Connect with real classmates at your school.</p>
+                        </div>
+                    </div>
 
                     {campusPeers.length === 0 ? (
-                        <p className="text-sm text-gray-500">No other peers found at your school yet! Invite some friends.</p>
+                        <div className="py-12 text-center bg-[var(--background)] rounded-3xl border-2 border-dashed border-[var(--border-soft)]">
+                            <p className="text-[var(--foreground-muted)]">No peers found at your school yet. Invite some friends!</p>
+                        </div>
                     ) : (
-                        <div className="flex flex-col gap-3">
+                        <div className="grid gap-4">
                             {campusPeers.map((peer) => (
-                                <div key={peer.id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            {/* Use a generic name since username doesn't exist yet */}
-                                            <span className="font-medium text-white">Campus Peer</span>
-                                            {/* Use unique_code instead of anon_code */}
-                                            <span className="text-xs text-gray-500">#{peer.unique_code}</span>
+                                <div key={peer.id} className="flex items-center justify-between p-4 rounded-3xl bg-[var(--background)] border border-[var(--border-soft)] hover:border-teal-500/40 transition-all group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 rounded-2xl bg-teal-500/10 flex items-center justify-center text-xl border border-teal-500/20 group-hover:scale-110 transition-transform">
+                                            {peer.unique_code?.substring(0, 2)}
                                         </div>
-                                        <div className="text-xs text-teal-400/80 mt-1">
-                                            Classmate
+                                        <div>
+                                            <p className="text-[var(--foreground)] font-bold">Campus Peer <span className="text-[var(--foreground-muted)] font-mono text-xs ml-2">#{peer.unique_code}</span></p>
+                                            <p className="text-xs text-teal-500 font-bold uppercase tracking-widest mt-0.5">Classmate</p>
                                         </div>
                                     </div>
 
-                                    <button className="px-3 py-1.5 text-xs font-medium rounded-full bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors">
+                                    <button className="px-5 py-2 text-xs font-bold rounded-xl bg-teal-500/10 text-teal-500 hover:bg-teal-500 text-white hover:shadow-lg transition-all">
                                         Add Friend
                                     </button>
                                 </div>
@@ -725,10 +730,10 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-12 flex justify-center">
                     <button
                         onClick={handleLogout}
-                        className="w-full rounded-2xl border border-red-500/30 bg-red-500/[0.08] py-3.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-all"
+                        className="px-8 py-3 rounded-2xl bg-red-500/5 border border-red-500/20 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95"
                     >
                         Log Out
                     </button>
