@@ -108,7 +108,7 @@ export default function LoginPage() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-[#050913] p-4 text-slate-200">
             <div className="w-full max-w-md rounded-[24px] border border-slate-800 bg-[#0A0F1C] p-8 shadow-2xl">
-                <h1 className="mb-2 text-2xl font-bold text-white">MentalMap Dashboard</h1>
+                <h1 className="mb-2 text-2xl font-bold text-white">Aura Atlas Dashboard</h1>
                 <p className="mb-8 text-sm text-slate-400">
                     {isSignUp ? 'Create an account to join the anonymous network.' : 'Sign in to access anonymous location-based analytics.'}
                 </p>

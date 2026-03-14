@@ -3,8 +3,8 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const DAILY_CHECK_IN_COMPLETED_KEY = "mentalmap-daily-check-in-completed";
-const DAILY_CHECK_IN_DISMISSED_KEY = "mentalmap-daily-check-in-dismissed";
+const DAILY_CHECK_IN_COMPLETED_KEY = "aura-atlas-daily-check-in-completed";
+const DAILY_CHECK_IN_DISMISSED_KEY = "aura-atlas-daily-check-in-dismissed";
 
 function pad(value: number) {
   return String(value).padStart(2, "0");

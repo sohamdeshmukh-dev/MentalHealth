@@ -11,9 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MentalMap - Your Mental Wellness Companion",
+  title: "Aura Atlas - Your Mental Wellness Companion",
   description:
-    "Interactive mood tracking, journaling, and mental health support with 3D emotional skyline visualization.",
+    "Track your mood, map your stress, and find your center.",
 };
 
 export default function RootLayout({

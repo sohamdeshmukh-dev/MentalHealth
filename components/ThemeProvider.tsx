@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ThemeContext, ThemeMode } from "@/hooks/useTheme";
 
-const STORAGE_KEY = "mentalmap-theme";
+const STORAGE_KEY = "aura-atlas-theme";
 
 function applyThemeClass(theme: ThemeMode) {
   const root = document.documentElement;

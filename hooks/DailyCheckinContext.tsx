@@ -12,7 +12,7 @@ const THERAPIST_PROMPTS = [
 ];
 
 /* ─── localStorage helpers ─── */
-const LS_PREFIX = "mentalmap-daily-checkin";
+const LS_PREFIX = "aura-atlas-daily-checkin";
 
 function todayKey(): string {
   const now = new Date();

@@ -7,6 +7,10 @@ import CampusDashboard from "@/components/CampusDashboard";
 import CollegePicker from "@/components/CollegePicker";
 import { useTheme } from "@/hooks/useTheme";
 import { CampusEmotionResponse, College } from "@/lib/types";
+import SmileScoreSurvey from "@/components/SmileScoreSurvey";
+import StripeCheckout from "@/components/StripeCheckout";
+
+
 
 const AVATARS = [
     "https://api.dicebear.com/7.x/shapes/svg?seed=Felix",
@@ -42,6 +46,11 @@ export default function ProfilePage() {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [campusPeers, setCampusPeers] = useState<any[]>([]);
     const { theme, setTheme, toggleTheme } = useTheme();
+    const [isCanvasLinked, setIsCanvasLinked] = useState(false);
+    const [isPremium, setIsPremium] = useState(false);
+    const [showCheckout, setShowCheckout] = useState(false);
+
+
 
     const fetchProfileData = useCallback(async () => {
         try {
@@ -243,7 +252,7 @@ export default function ProfilePage() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `mentalmap-profile-export.json`;
+            a.download = `aura-atlas-profile-export.json`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (err) {
@@ -370,7 +379,18 @@ export default function ProfilePage() {
         }
     }
 
+    const handleCanvasConnect = () => {
+        window.open("https://canvas.instructure.com/login/canvas", "_blank");
+        setTimeout(() => setIsCanvasLinked(true), 1500);
+    };
+
+    const handleStripeUpgrade = () => {
+        window.open("https://checkout.stripe.com/pay", "_blank");
+        setTimeout(() => setIsPremium(true), 2000);
+    };
+
     async function handleLogout() {
+
         await supabase.auth.signOut();
         window.location.href = "/login";
     }
@@ -525,6 +545,39 @@ export default function ProfilePage() {
                     onDeleteAllJournal={handleDeleteAllJournal}
                 />
 
+                <div className="mt-6 mb-6">
+                    <SmileScoreSurvey userId={profile?.id} />
+                </div>
+
+                <div className="space-y-3 mt-6 mb-6">
+                    <div className="flex justify-between items-center p-4 bg-orange-900/20 border border-orange-500/30 rounded-xl">
+                        <div>
+                            <h4 className="text-white font-semibold">Canvas IQ Integration</h4>
+                            <p className="text-xs text-orange-200/70">Sync assignments to map stress peaks.</p>
+                        </div>
+                        <button onClick={handleCanvasConnect} className={`px-4 py-2 text-sm font-bold rounded-lg transition ${isCanvasLinked ? "bg-orange-500/20 text-orange-400" : "bg-orange-600 text-white"}`}>
+                            {isCanvasLinked ? "Synced ✓" : "Connect LMS"}
+                        </button>
+                    </div>
+                    <div className="flex justify-between items-center p-4 bg-purple-900/20 border border-purple-500/30 rounded-xl">
+                        <div>
+                            <h4 className="text-white font-semibold">Aura Atlas Pro</h4>
+                            <p className="text-xs text-purple-200/70">$5.49/mo for advanced AI mood forecasting.</p>
+                        </div>
+                        <button 
+                            onClick={() => setShowCheckout(true)} 
+                            disabled={isPremium}
+                            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all duration-300 w-36 flex justify-center ${
+                                isPremium 
+                                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/50 cursor-default" 
+                                    : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
+                            }`}
+                        >
+                            {isPremium ? "Active ✓" : "Upgrade"}
+                        </button>
+                    </div>
+                </div>
+
                 <CollegePicker
                     currentCollege={college}
                     currentCity={profile?.city ?? null}
@@ -589,6 +642,13 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {showCheckout && (
+                <StripeCheckout 
+                    userId={profile?.id} 
+                    userEmail={userEmail} 
+                    onClose={() => setShowCheckout(false)} 
+                />
             )}
         </div>
     );

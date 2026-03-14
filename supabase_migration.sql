@@ -1,4 +1,4 @@
--- Supabase Migration: MentalMap Navigation & Profile System
+-- Supabase Migration: Aura Atlas Navigation & Profile System
 -- Run this in Supabase SQL Editor
 
 -- Mood Journal

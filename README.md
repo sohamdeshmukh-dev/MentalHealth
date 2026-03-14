@@ -455,7 +455,7 @@ It becomes like weather forecasting for emotions.
 If you want, I can also show you 3 features that judges consistently give first place to at hackathons (they’re surprisingly simple but look insanely impressive).
 
 
-# MentalMap
+# Aura Atlas
 
 A 3D interactive emotional skyline platform where stress reports rise from the map as vertical extrusions like skyscrapers, and mood data glows as a Snap Map-style heatmap across 11 US cities.
 
