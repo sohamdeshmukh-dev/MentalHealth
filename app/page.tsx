@@ -252,25 +252,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ✅ Bottom Left: Filters and Time */}
-      <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-4">
-        <div className="flex gap-2">
-          {["All", "Morning", "Afternoon", "Evening", "Night"].map((filterName) => (
-            <button
-              key={filterName}
-              onClick={() => setTimeFilter(filterName)}
-              className={`px-4 py-1 rounded-full text-sm transition-all duration-300 ${timeFilter === filterName
-                ? "bg-teal-500 shadow-[0_0_12px_rgba(20,184,166,0.4)]"
-                : "bg-black/50 text-white hover:bg-black/70"
-                }`}
-            >
-              {filterName}
-            </button>
-          ))}
-        </div>
-        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 w-64 border border-gray-700/50 shadow-2xl">
-          <LocalClock selectedCity={city.name} selectedState={city.state} />
-        </div>
+      {/* ✅ Bottom Left: Local Clock */}
+      <div className="absolute bottom-8 left-8 z-40 bg-black/80 backdrop-blur-md rounded-xl p-4 w-64 border border-gray-700/50 shadow-2xl">
+        <LocalClock selectedCity={city.name} selectedState={city.state} />
       </div>
 
       {/* ✅ Bottom Right: Tools */}
